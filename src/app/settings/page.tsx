@@ -261,8 +261,12 @@ export default function Settings() {
                     {(item) => (
                       <VoiceSelectItem key={item.id}>{item.name}</VoiceSelectItem>
                     )}
-                  </ListBox>
-                </Autocomplete>
+                  </span>
+                </button>
+              ))
+            ) : (
+              <div className="px-4 py-8 text-center text-gray-500">
+                No voices found
               </div>
             )}
           </div>
@@ -348,7 +352,6 @@ export default function Settings() {
           <p className="text-gray-400 text-xs sm:text-sm text-center">
             Click outside or press <kbd className="px-2 py-1 bg-gray-800 rounded text-xs font-mono">ESC</kbd> to close
           </p>
-        </div>
         </div>
       </div>
     </div>
