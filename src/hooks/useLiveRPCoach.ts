@@ -1,0 +1,642 @@
+// ============================================================================
+// LIVE RP COACH HOOK - Full-Duplex Audio with Gemini 2.5 Flash Native Audio
+// ============================================================================
+
+'use client';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  SessionMetrics,
+  MetricsUpdate,
+  ConnectionStatus,
+  SessionHistory,
+  STORAGE_KEYS,
+  DEFAULT_USER_PROFILE,
+} from '@/types';
+import { generateSessionId } from '@/lib/prompt-builder';
+
+const WS_URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent';
+const RECONNECT_DELAY_MS = [1000, 2000, 5000, 10000]; // Exponential backoff
+
+interface UseLiveRPCoachReturn {
+  isConnected: boolean;
+  isRecording: boolean;
+  connectionStatus: ConnectionStatus;
+  currentMetrics: SessionMetrics | null;
+  sessionHistory: SessionHistory[];
+  error: string | null;
+  startSession: () => Promise<void>;
+  stopSession: () => void;
+  saveCheckpoint: () => void;
+  clearHistory: () => void;
+}
+
+export function useLiveRPCoach(): UseLiveRPCoachReturn {
+  // State
+  const [isConnected, setIsConnected] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
+    connected: false,
+    reconnecting: false,
+  });
+  const [currentMetrics, setCurrentMetrics] = useState<SessionMetrics | null>(null);
+  const [sessionHistory, setSessionHistory] = useState<SessionHistory[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  // Refs
+  const wsRef = useRef<WebSocket | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const reconnectAttemptRef = useRef(0);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionStartTimeRef = useRef<Date | null>(null);
+  const metricsUpdateCountRef = useRef(0);
+  const currentSessionIdRef = useRef<string | null>(null);
+  const isConnectingRef = useRef(false); // Prevent multiple simultaneous connections
+  const activeAudioSourcesRef = useRef<AudioBufferSourceNode[]>([]); // Track active playback
+  const audioScheduleTimeRef = useRef<number>(0); // Track when next audio should play
+
+  // ============================================================================
+  // STORAGE HELPERS
+  // ============================================================================
+
+  const loadFromStorage = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const currentStatus = localStorage.getItem(STORAGE_KEYS.CURRENT_STATUS);
+      if (currentStatus) {
+        setCurrentMetrics(JSON.parse(currentStatus));
+      }
+
+      const history = localStorage.getItem(STORAGE_KEYS.SESSION_HISTORY);
+      if (history) {
+        setSessionHistory(JSON.parse(history));
+      }
+    } catch (err) {
+      console.error('Failed to load from storage:', err);
+    }
+  }, []);
+
+  const saveToStorage = useCallback((metrics: SessionMetrics) => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      // Save current status
+      localStorage.setItem(STORAGE_KEYS.CURRENT_STATUS, JSON.stringify(metrics));
+
+      // If this is the first benchmark, save it
+      if (!localStorage.getItem(STORAGE_KEYS.INITIAL_BENCHMARK)) {
+        localStorage.setItem(STORAGE_KEYS.INITIAL_BENCHMARK, JSON.stringify(metrics));
+      }
+
+      setCurrentMetrics(metrics);
+    } catch (err) {
+      console.error('Failed to save to storage:', err);
+    }
+  }, []);
+
+  const saveSessionToHistory = useCallback((metrics: SessionMetrics, duration: number) => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const newSession: SessionHistory = {
+        session_id: metrics.session_id,
+        date: new Date().toISOString(),
+        duration_minutes: Math.round(duration / 60),
+        metrics,
+        achievements: metrics.mastery_confirmed ? [metrics.previous_focus] : [],
+      };
+
+      const history = [...sessionHistory, newSession].slice(-10); // Keep last 10
+      localStorage.setItem(STORAGE_KEYS.SESSION_HISTORY, JSON.stringify(history));
+      setSessionHistory(history);
+    } catch (err) {
+      console.error('Failed to save session history:', err);
+    }
+  }, [sessionHistory]);
+
+  // ============================================================================
+  // AUDIO SETUP
+  // ============================================================================
+
+  const setupAudio = useCallback(async () => {
+    try {
+      // iOS requires specific constraints and error handling
+      const constraints = {
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          // iOS Safari prefers these specific settings
+          sampleRate: { ideal: 16000 },
+          channelCount: { ideal: 1 },
+        },
+        video: false, // Explicitly disable video for iOS
+      };
+
+      // Request microphone access (must be called from user gesture on iOS)
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (permissionError: any) {
+        // iOS-specific error handling
+        if (permissionError.name === 'NotAllowedError') {
+          throw new Error('Microphone permission denied. Please enable microphone access in Settings > Safari > Camera & Microphone');
+        } else if (permissionError.name === 'NotFoundError') {
+          throw new Error('No microphone found on this device');
+        } else if (permissionError.name === 'NotReadableError') {
+          throw new Error('Microphone is already in use by another app');
+        }
+        throw permissionError;
+      }
+
+      audioStreamRef.current = stream;
+
+      // Create audio context (iOS Safari requires user interaction)
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) {
+        throw new Error('Web Audio API not supported on this browser');
+      }
+
+      const audioContext = new AudioContextClass({ 
+        sampleRate: 16000,
+        // iOS optimization
+        latencyHint: 'interactive',
+      });
+      
+      // Resume immediately to handle iOS autoplay restrictions
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+      
+      audioContextRef.current = audioContext;
+
+      // Create media stream source
+      const source = audioContext.createMediaStreamSource(stream);
+      
+      // Create script processor for audio chunks
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      
+      processor.onaudioprocess = (e) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+
+        const inputData = e.inputBuffer.getChannelData(0);
+        
+        // Convert Float32Array to Int16Array (PCM16)
+        const pcmData = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          const s = Math.max(-1, Math.min(1, inputData[i]));
+          pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+
+        // Send audio data to WebSocket
+        const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
+        
+        wsRef.current.send(JSON.stringify({
+          realtimeInput: {
+            mediaChunks: [{
+              mimeType: 'audio/pcm;rate=16000',
+              data: base64Audio,
+            }],
+          },
+        }));
+      };
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+      
+      setIsRecording(true);
+      return true;
+    } catch (err) {
+      console.error('Audio setup failed:', err);
+      setError('Microphone access denied or unavailable');
+      return false;
+    }
+  }, []);
+
+  const cleanupAudio = useCallback(() => {
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach(track => track.stop());
+      audioStreamRef.current = null;
+    }
+
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    setIsRecording(false);
+  }, []);
+
+  // ============================================================================
+  // WEBSOCKET SETUP
+  // ============================================================================
+
+  const connectWebSocket = useCallback(async (apiKey: string, systemInstruction: string) => {
+    // Prevent multiple simultaneous connections
+    if (isConnectingRef.current) {
+      console.log('Connection already in progress, skipping');
+      return wsRef.current;
+    }
+
+    // Close any existing connection first
+    if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
+      console.log('Closing existing connection');
+      wsRef.current.close(1000, 'Starting new connection');
+      wsRef.current = null;
+    }
+
+    // Stop all active audio playback
+    activeAudioSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch (e) {}
+    });
+    activeAudioSourcesRef.current = [];
+
+    isConnectingRef.current = true;
+
+    return new Promise<WebSocket>((resolve, reject) => {
+      const ws = new WebSocket(`${WS_URL}?key=${apiKey}`);
+      
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        isConnectingRef.current = false;
+        
+        // Send setup message
+        ws.send(JSON.stringify({
+          setup: {
+            model: 'models/gemini-2.5-flash-native-audio-preview-12-2025',
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: 'Enceladus',
+                  },
+                },
+              },
+            },
+            systemInstruction: {
+              parts: [{ text: systemInstruction }],
+            },
+          },
+        }));
+
+        setIsConnected(true);
+        setConnectionStatus({
+          connected: true,
+          reconnecting: false,
+          lastConnected: new Date(),
+        });
+        reconnectAttemptRef.current = 0;
+        
+        resolve(ws);
+      };
+
+      ws.onerror = (event) => {
+        console.error('WebSocket error:', event);
+        isConnectingRef.current = false;
+        reject(new Error('WebSocket connection failed'));
+      };
+
+      ws.onclose = (event) => {
+        console.log('WebSocket closed:', event.code, event.reason);
+        isConnectingRef.current = false;
+        setIsConnected(false);
+        setConnectionStatus(prev => ({
+          ...prev,
+          connected: false,
+        }));
+        
+        // Stop all active audio on disconnect
+        activeAudioSourcesRef.current.forEach(source => {
+          try { source.stop(); } catch (e) {}
+        });
+        activeAudioSourcesRef.current = [];
+        
+        // Only auto-reconnect if manually closed AND not too many attempts
+        // Disabled auto-reconnect to prevent loops - user must manually restart
+        // if (event.code !== 1000 && reconnectAttemptRef.current < RECONNECT_DELAY_MS.length) {
+        //   attemptReconnect();
+        // }
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          // Handle Blob (binary) messages
+          if (event.data instanceof Blob) {
+            const text = await event.data.text();
+            const data = JSON.parse(text);
+            handleWebSocketMessage(data);
+          } 
+          // Handle string (JSON) messages
+          else if (typeof event.data === 'string') {
+            const data = JSON.parse(event.data);
+            handleWebSocketMessage(data);
+          }
+        } catch (err) {
+          console.error('Failed to parse WebSocket message:', err);
+        }
+      };
+
+      wsRef.current = ws;
+    });
+  }, []);
+
+  const attemptReconnect = useCallback(() => {
+    if (reconnectAttemptRef.current >= RECONNECT_DELAY_MS.length) {
+      setError('Connection lost. Please refresh the page.');
+      return;
+    }
+
+    const delay = RECONNECT_DELAY_MS[reconnectAttemptRef.current];
+    setConnectionStatus(prev => ({
+      ...prev,
+      reconnecting: true,
+      error: `Reconnecting in ${delay / 1000}s...`,
+    }));
+
+    reconnectTimeoutRef.current = setTimeout(() => {
+      reconnectAttemptRef.current++;
+      startSession();
+    }, delay);
+  }, []);
+
+  // ============================================================================
+  // MESSAGE HANDLING
+  // ============================================================================
+
+  const handleWebSocketMessage = useCallback((data: any) => {
+    // Handle setup completion
+    if (data.setupComplete) {
+      console.log('Setup complete');
+      return;
+    }
+
+    // Handle server content (audio + text)
+    if (data.serverContent) {
+      const { modelTurn } = data.serverContent;
+      
+      if (modelTurn?.parts) {
+        modelTurn.parts.forEach((part: any) => {
+          // Handle text responses (metrics updates)
+          if (part.text) {
+            parseMetricsUpdate(part.text);
+          }
+
+          // Handle audio responses (play back)
+          if (part.inlineData?.mimeType?.startsWith('audio/')) {
+            playAudioResponse(part.inlineData.data);
+          }
+        });
+      }
+    }
+
+    // Handle tool calls or other server messages
+    if (data.toolCall) {
+      console.log('Tool call received:', data.toolCall);
+    }
+  }, []);
+
+  const parseMetricsUpdate = useCallback((text: string) => {
+    try {
+      // Look for JSON in the text
+      const jsonMatch = text.match(/\{[\s\S]*"metrics_update"[\s\S]*\}/);
+      if (!jsonMatch) return;
+
+      const update: MetricsUpdate = JSON.parse(jsonMatch[0]);
+      
+      if (update.metrics_update) {
+        console.log('Metrics update received:', update);
+        saveToStorage(update.metrics_update);
+        metricsUpdateCountRef.current++;
+
+        // Handle trigger events
+        if (update.trigger_event === 'SHIFT_FOCUS') {
+          console.log('Focus shifted to:', update.metrics_update.next_primary_focus);
+        } else if (update.trigger_event === 'BENCHMARK_COMPLETE') {
+          console.log('Benchmark complete');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to parse metrics update:', err);
+    }
+  }, [saveToStorage]);
+
+  const playAudioResponse = useCallback(async (base64Audio: string) => {
+    try {
+      if (!audioContextRef.current) return;
+
+      // Resume AudioContext if suspended (required for iOS)
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+
+      // Decode base64 to binary
+      const binaryString = atob(base64Audio);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      // Convert to Int16Array (PCM16)
+      const pcm16 = new Int16Array(bytes.buffer);
+      
+      // Create audio buffer (24kHz from Gemini)
+      const sampleRate = 24000;
+      const audioBuffer = audioContextRef.current.createBuffer(
+        1, // mono
+        pcm16.length,
+        sampleRate
+      );
+
+      // Convert Int16 to Float32 for Web Audio API
+      const channelData = audioBuffer.getChannelData(0);
+      for (let i = 0; i < pcm16.length; i++) {
+        channelData[i] = pcm16[i] / 32768.0; // Normalize to -1.0 to 1.0
+      }
+
+      // Calculate when to start this audio chunk
+      const currentTime = audioContextRef.current.currentTime;
+      const startTime = Math.max(currentTime, audioScheduleTimeRef.current);
+      
+      // Update schedule time for next chunk
+      audioScheduleTimeRef.current = startTime + audioBuffer.duration;
+
+      // Play the audio at scheduled time
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContextRef.current.destination);
+      
+      // Track this source
+      activeAudioSourcesRef.current.push(source);
+      
+      // Remove from tracking when finished
+      source.onended = () => {
+        const index = activeAudioSourcesRef.current.indexOf(source);
+        if (index > -1) {
+          activeAudioSourcesRef.current.splice(index, 1);
+        }
+      };
+      
+      // Start at scheduled time for smooth playback
+      source.start(startTime);
+      
+    } catch (err) {
+      console.error('Failed to play audio response:', err);
+    }
+  }, []);
+
+  // ============================================================================
+  // PUBLIC METHODS
+  // ============================================================================
+
+  const startSession = useCallback(async () => {
+    // Prevent starting if already connected
+    if (isConnected || isConnectingRef.current) {
+      console.log('Session already active or connecting');
+      return;
+    }
+
+    try {
+      setError(null);
+
+      // Clean up any existing session first
+      if (wsRef.current || audioContextRef.current) {
+        console.log('Cleaning up existing session before starting new one');
+        stopSession();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay for cleanup
+      }
+
+      // Load current metrics from storage
+      const storedMetrics = localStorage.getItem(STORAGE_KEYS.CURRENT_STATUS);
+      const metrics = storedMetrics ? JSON.parse(storedMetrics) : null;
+
+      // Generate new session ID
+      const sessionId = generateSessionId();
+      currentSessionIdRef.current = sessionId;
+      sessionStartTimeRef.current = new Date();
+
+      // Get session config from API
+      const response = await fetch('/api/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          metrics,
+          userProfile: DEFAULT_USER_PROFILE,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to initialize session');
+      }
+
+      const { config, systemInstruction } = await response.json();
+
+      // Connect WebSocket
+      await connectWebSocket(config.apiKey, systemInstruction);
+
+      // Setup audio
+      await setupAudio();
+
+    } catch (err) {
+      console.error('Failed to start session:', err);
+      setError(err instanceof Error ? err.message : 'Failed to start session');
+      setConnectionStatus({
+        connected: false,
+        reconnecting: false,
+        error: err instanceof Error ? err.message : 'Connection failed',
+      });
+    }
+  }, [connectWebSocket, setupAudio]);
+
+  const stopSession = useCallback(() => {
+    console.log('Stopping session...');
+    
+    // Stop all active audio immediately
+    activeAudioSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch (e) {}
+    });
+    activeAudioSourcesRef.current = [];
+    audioScheduleTimeRef.current = 0; // Reset audio schedule
+
+    // Calculate session duration
+    if (sessionStartTimeRef.current && currentMetrics) {
+      const duration = (Date.now() - sessionStartTimeRef.current.getTime()) / 1000;
+      saveSessionToHistory(currentMetrics, duration);
+    }
+
+    // Close WebSocket
+    if (wsRef.current) {
+      try {
+        wsRef.current.close(1000, 'User stopped session');
+      } catch (e) {
+        console.error('Error closing WebSocket:', e);
+      }
+      wsRef.current = null;
+    }
+
+    // Cleanup audio
+    cleanupAudio();
+
+    // Clear reconnect timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    // Reset flags
+    isConnectingRef.current = false;
+    setIsConnected(false);
+    setConnectionStatus({ connected: false, reconnecting: false });
+    sessionStartTimeRef.current = null;
+    metricsUpdateCountRef.current = 0;
+  }, [cleanupAudio, currentMetrics, saveSessionToHistory]);
+
+  const saveCheckpoint = useCallback(() => {
+    if (currentMetrics) {
+      saveToStorage(currentMetrics);
+      console.log('Checkpoint saved');
+    }
+  }, [currentMetrics, saveToStorage]);
+
+  const clearHistory = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    
+    if (confirm('Are you sure you want to clear all session history? This cannot be undone.')) {
+      localStorage.removeItem(STORAGE_KEYS.SESSION_HISTORY);
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_STATUS);
+      setSessionHistory([]);
+      setCurrentMetrics(null);
+    }
+  }, []);
+
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+
+  // Load data on mount
+  useEffect(() => {
+    loadFromStorage();
+  }, [loadFromStorage]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopSession();
+    };
+  }, [stopSession]);
+
+  return {
+    isConnected,
+    isRecording,
+    connectionStatus,
+    currentMetrics,
+    sessionHistory,
+    error,
+    startSession,
+    stopSession,
+    saveCheckpoint,
+    clearHistory,
+  };
+}
