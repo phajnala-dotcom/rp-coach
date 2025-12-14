@@ -16,6 +16,7 @@ export default function Home() {
     stopSession,
     saveCheckpoint,
     clearHistory,
+    isGeneratingReport,
   } = useLiveRPCoach();
 
   const [sessionDuration, setSessionDuration] = useState(0);
@@ -58,131 +59,134 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <header className="mb-12 text-center">
-          <h1 className="text-5xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-            RP Native Coach
-          </h1>
-          <p className="text-gray-400 text-lg">
-            Your personal Modern RP pronunciation coach, <span className="text-blue-400 font-semibold">Steve</span>
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            Welcome back, {DEFAULT_USER_PROFILE.name} 👋
-          </p>
-        </header>
-
+    <div className="min-h-screen p-6 md:p-12">
+      <div className="max-w-7xl mx-auto">
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Left Column - Voice Interface */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Connection Status Bar */}
-            <div className="bg-gray-800 rounded-xl p-4 flex items-center justify-between border border-gray-700">
-              <div className="flex items-center gap-3">
-                <div className={`w-3 h-3 rounded-full ${getConnectionStatusColor()} animate-pulse`} />
-                <span className="text-sm font-medium">
-                  {connectionStatus.reconnecting
-                    ? 'Reconnecting...'
-                    : connectionStatus.connected
-                    ? 'Connected'
-                    : 'Disconnected'}
-                </span>
-                {connectionStatus.error && (
-                  <span className="text-xs text-red-400">({connectionStatus.error})</span>
-                )}
-              </div>
-              
-              {isConnected && (
-                <div className="text-sm text-gray-400">
-                  Session: {formatDuration(sessionDuration)}
-                </div>
-              )}
-            </div>
-
-            {/* Voice Orb */}
-            <div className="bg-gray-800 rounded-2xl p-12 border border-gray-700 flex flex-col items-center justify-center min-h-[400px]">
+            {/* Voice Orb - UK Themed */}
+            <div className="relative bg-gradient-to-br from-gray-900/50 via-slate-900/50 to-gray-900/50 backdrop-blur-xl rounded-3xl p-16 flex flex-col items-center justify-center min-h-[500px] shadow-2xl">
               {!isConnected ? (
                 // Start Button
-                <div className="text-center space-y-6">
-                  <div className="w-40 h-40 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-20 w-20 text-white"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-                      />
-                    </svg>
+                <div className="text-center space-y-8">
+                  {/* UK Flag - Artistic Union Jack */}
+                  <div className="relative w-[264px] h-[264px] mx-auto" style={{marginTop: '-60px'}}>
+                    {/* Visible blurred border using absolute positioned divs */}
+                    <div className="absolute inset-0 rounded-full" style={{
+                      background: 'radial-gradient(circle, rgba(0,40,104,0.4) 0%, rgba(200,16,46,0.3) 50%, transparent 100%)',
+                      filter: 'blur(20px)',
+                      transform: 'scale(1.2)'
+                    }} />
+                    <div className="uk-orb w-full h-full rounded-full flex items-center justify-center overflow-hidden relative z-10">
+                      <svg className="w-[230px] h-[230px]" viewBox="0 0 60 30" xmlns="http://www.w3.org/2000/svg">
+                        {/* Background Navy */}
+                        <rect width="60" height="30" fill="#012169"/>
+                        
+                        {/* White diagonals */}
+                        <path d="M 0,0 L 60,30 M 60,0 L 0,30" stroke="#FFF" strokeWidth="6"/>
+                        
+                        {/* Red diagonals */}
+                        <path d="M 0,0 L 60,30 M 60,0 L 0,30" stroke="#C8102E" strokeWidth="4"/>
+                        
+                        {/* White cross */}
+                        <path d="M 30,0 L 30,30 M 0,15 L 60,15" stroke="#FFF" strokeWidth="10"/>
+                        
+                        {/* Red cross */}
+                        <path d="M 30,0 L 30,30 M 0,15 L 60,15" stroke="#C8102E" strokeWidth="6"/>
+                        
+                        {/* Diagonal white offset stripes for depth */}
+                        <path d="M 0,0 L 60,30" stroke="#FFF" strokeWidth="6" opacity="0.3" transform="translate(1,-1)"/>
+                        <path d="M 60,0 L 0,30" stroke="#FFF" strokeWidth="6" opacity="0.3" transform="translate(-1,-1)"/>
+                      </svg>
+                    </div>
                   </div>
                   
                   <button
                     onClick={startSession}
-                    className="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-full text-lg font-semibold transition-all transform hover:scale-105 shadow-lg"
+                    className="button-premium px-36 py-[19px] bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 rounded-3xl text-5xl font-black transition-all transform hover:scale-110 shadow-2xl hover:shadow-blue-500/50 border-4 border-blue-400/40 hover:translate-y-[-2px] active:translate-y-0"
+                    style={{
+                      textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                      boxShadow: '0 8px 16px rgba(59, 130, 246, 0.3), 0 4px 6px rgba(0, 0, 0, 0.3), inset 0 -2px 0 rgba(0, 0, 0, 0.2)',
+                      marginTop: '50px'
+                    }}
                   >
-                    Start Coaching Session
+                    🎙️ Begin RP Coaching
                   </button>
-                  
-                  <p className="text-gray-400 text-sm max-w-md">
-                    Click to begin your full-duplex voice session with Steve.
-                    Make sure your microphone is enabled.
-                  </p>
                 </div>
               ) : (
                 // Active Session
-                <div className="text-center space-y-8">
-                  <div
-                    className={`w-48 h-48 mx-auto rounded-full flex items-center justify-center shadow-2xl ${
-                      isRecording
-                        ? 'bg-gradient-to-br from-blue-500 to-purple-600 orb-listening'
-                        : 'bg-gradient-to-br from-gray-600 to-gray-700 orb-pulse'
-                    }`}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-24 w-24 text-white"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-                      />
-                    </svg>
+                <div className="text-center space-y-10">
+                  {/* Animated UK Flag Orb */}
+                  <div className="relative w-72 h-72 mx-auto">
+                    <div className={`uk-orb ${isRecording ? 'uk-orb-listening' : ''} w-full h-full rounded-full flex items-center justify-center overflow-hidden`}>
+                      {/* Union Jack SVG */}
+                      <svg className="w-60 h-60 absolute" viewBox="0 0 60 30" xmlns="http://www.w3.org/2000/svg" opacity="0.4">
+                        <rect width="60" height="30" fill="#012169"/>
+                        <path d="M 0,0 L 60,30 M 60,0 L 0,30" stroke="#FFF" strokeWidth="6"/>
+                        <path d="M 0,0 L 60,30 M 60,0 L 0,30" stroke="#C8102E" strokeWidth="4"/>
+                        <path d="M 30,0 L 30,30 M 0,15 L 60,15" stroke="#FFF" strokeWidth="10"/>
+                        <path d="M 30,0 L 30,30 M 0,15 L 60,15" stroke="#C8102E" strokeWidth="6"/>
+                      </svg>
+                      <div className="uk-flag-overlay" />
+                      {/* Microphone Wave Icon */}
+                      <div className="relative z-10">
+                        {isRecording ? (
+                          <div className="flex flex-col items-center">
+                            <svg className="w-24 h-24 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                            </svg>
+                            <div className="flex gap-1 mt-4">
+                              <div className="w-1 h-8 bg-white/80 rounded-full animate-pulse" style={{animationDelay: '0s'}} />
+                              <div className="w-1 h-12 bg-white/80 rounded-full animate-pulse" style={{animationDelay: '0.1s'}} />
+                              <div className="w-1 h-6 bg-white/80 rounded-full animate-pulse" style={{animationDelay: '0.2s'}} />
+                              <div className="w-1 h-10 bg-white/80 rounded-full animate-pulse" style={{animationDelay: '0.3s'}} />
+                              <div className="w-1 h-8 bg-white/80 rounded-full animate-pulse" style={{animationDelay: '0.4s'}} />
+                            </div>
+                          </div>
+                        ) : (
+                          <svg className="w-32 h-32 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" strokeWidth="2" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <p className="text-2xl font-semibold text-blue-400">
-                      {isRecording ? 'Listening...' : 'Processing...'}
+                  <div className="space-y-3">
+                    <p className="text-3xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                      {isRecording ? '🎤 Listening to you...' : '🤔 Steve is thinking...'}
                     </p>
-                    <p className="text-gray-400 text-sm">
-                      Speak naturally with Steve
+                    <p className="text-gray-300 text-base">
+                      {isRecording ? 'Speak naturally' : 'Processing your pronunciation'}
                     </p>
                   </div>
 
-                  <div className="flex gap-4 justify-center">
+                  <div className="flex gap-6 justify-center">
                     <button
                       onClick={saveCheckpoint}
-                      className="px-6 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium transition-all"
+                      disabled={!isConnected}
+                      className="button-premium px-[38px] py-[19px] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-2xl text-xl font-black transition-all transform hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg hover:shadow-emerald-500/50 border-4 border-emerald-400/40 hover:translate-y-[-2px] active:translate-y-0"
+                      style={{
+                        textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                        boxShadow: '0 8px 16px rgba(16, 185, 129, 0.3), 0 4px 6px rgba(0, 0, 0, 0.3), inset 0 -2px 0 rgba(0, 0, 0, 0.2)'
+                      }}
                     >
-                      Save Checkpoint
+                      📋 Mark for Report
                     </button>
                     <button
                       onClick={stopSession}
-                      className="px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium transition-all"
+                      disabled={isGeneratingReport}
+                      className="button-premium px-[38px] py-[19px] bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 rounded-2xl text-xl font-black transition-all transform hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg hover:shadow-rose-500/50 border-4 border-rose-400/40 hover:translate-y-[-2px] active:translate-y-0"
+                      style={{
+                        textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                        boxShadow: '0 8px 16px rgba(244, 63, 94, 0.3), 0 4px 6px rgba(0, 0, 0, 0.3), inset 0 -2px 0 rgba(0, 0, 0, 0.2)'
+                      }}
                     >
-                      End Session
+                      {isGeneratingReport ? '📄 Generating...' : '⏹️ End Session'}
                     </button>
                   </div>
                 </div>
@@ -191,35 +195,34 @@ export default function Home() {
 
             {/* Error Display */}
             {error && (
-              <div className="bg-red-900/30 border border-red-500 rounded-lg p-4 text-red-200">
-                <strong className="font-semibold">Error: </strong>
-                {error}
+              <div className="bg-gradient-to-r from-red-900/40 to-rose-900/40 backdrop-blur-lg border-2 border-red-500/50 rounded-2xl p-5 text-red-200 shadow-xl shadow-red-900/30">
+                <strong className="font-bold text-red-300">⚠️ Error: </strong>
+                <span className="font-medium">{error}</span>
               </div>
             )}
 
             {/* Current Focus */}
             {currentMetrics && (
-              <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <span className="text-2xl">🎯</span>
-                  Current Focus
+              <div className="bg-gradient-to-br from-gray-900/60 via-slate-900/60 to-gray-900/60 backdrop-blur-lg rounded-2xl p-6 shadow-xl">
+                <h3 className="text-xl font-bold mb-5 pb-4 border-b border-gray-700/30 flex items-center gap-3">
+                  <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Current Focus</span>
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-400">Primary</p>
-                    <p className="font-medium text-blue-400">{currentMetrics.next_primary_focus}</p>
+                  <div className="bg-gray-800/50 rounded-xl p-4 border border-blue-500/30">
+                    <p className="text-sm text-gray-400 mb-1">Primary</p>
+                    <p className="font-semibold text-blue-400">{currentMetrics.next_primary_focus}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-400">Secondary</p>
-                    <p className="font-medium text-purple-400">{currentMetrics.next_secondary_focus}</p>
+                  <div className="bg-gray-800/50 rounded-xl p-4 border border-purple-500/30">
+                    <p className="text-sm text-gray-400 mb-1">Secondary</p>
+                    <p className="font-semibold text-purple-400">{currentMetrics.next_secondary_focus}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-400">Current Accuracy</p>
-                    <p className="font-medium text-green-400">{currentMetrics.current_accuracy}%</p>
+                  <div className="bg-gray-800/50 rounded-xl p-4 border border-green-500/30">
+                    <p className="text-sm text-gray-400 mb-1">Current Accuracy</p>
+                    <p className="font-semibold text-green-400 text-lg">{currentMetrics.current_accuracy}%</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-400">RP Level</p>
-                    <p className="font-medium text-yellow-400">{currentMetrics.rp_level}</p>
+                  <div className="bg-gray-800/50 rounded-xl p-4 border border-yellow-500/30">
+                    <p className="text-sm text-gray-400 mb-1">RP Level</p>
+                    <p className="font-semibold text-yellow-400">{currentMetrics.rp_level}</p>
                   </div>
                 </div>
               </div>
@@ -230,10 +233,9 @@ export default function Home() {
           <div className="space-y-6">
             
             {/* Progress Overview */}
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <span className="text-2xl">📊</span>
-                Progress Overview
+            <div className="bg-gradient-to-br from-gray-900/60 via-slate-900/60 to-gray-900/60 backdrop-blur-lg rounded-2xl p-6 shadow-xl">
+              <h3 className="text-xl font-bold mb-5 pb-4 border-b border-gray-700/30 flex items-center gap-3">
+                <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">Progress Overview</span>
               </h3>
               
               {currentMetrics ? (
@@ -280,21 +282,25 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                <p className="text-gray-500 text-sm">No session data yet. Start your first session!</p>
+                <div className="text-center py-8">
+                  <p className="text-gray-500 text-base flex flex-col items-center gap-2">
+                    <span className="text-4xl">📊</span>
+                    No session data yet. Start your first session!
+                  </p>
+                </div>
               )}
             </div>
 
             {/* Session History */}
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <span className="text-2xl">📅</span>
-                  Session History
+            <div className="bg-gradient-to-br from-gray-900/60 via-slate-900/60 to-gray-900/60 backdrop-blur-lg rounded-2xl p-6 shadow-xl">
+              <div className="flex items-center justify-between mb-5 pb-4 border-b border-gray-700/30">
+                <h3 className="text-xl font-bold flex items-center gap-3">
+                  <span className="bg-gradient-to-r from-pink-400 to-rose-400 bg-clip-text text-transparent">Session History</span>
                 </h3>
                 {sessionHistory.length > 0 && (
                   <button
                     onClick={clearHistory}
-                    className="text-xs text-red-400 hover:text-red-300"
+                    className="button-premium text-sm text-red-400 hover:text-red-300 px-3 py-1 rounded-lg border border-red-500/30 hover:bg-red-900/20 transition-all"
                   >
                     Clear
                   </button>
@@ -302,25 +308,25 @@ export default function Home() {
               </div>
 
               {sessionHistory.length > 0 ? (
-                <div className="space-y-3 max-h-64 overflow-y-auto">
+                <div className="space-y-3 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
                   {sessionHistory.slice().reverse().map((session) => (
                     <div
                       key={session.session_id}
-                      className="bg-gray-700/50 rounded-lg p-3 text-sm"
+                      className="bg-gray-800/60 rounded-xl p-4 text-sm hover:border-blue-500/50 transition-all"
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <span className="text-gray-400">
+                        <span className="text-gray-300 font-medium">
                           {new Date(session.date).toLocaleDateString()}
                         </span>
-                        <span className="text-blue-400 font-medium">
+                        <span className="text-blue-400 font-bold bg-blue-900/30 px-2 py-1 rounded-lg">
                           {session.duration_minutes}m
                         </span>
                       </div>
-                      <p className="text-xs text-gray-300 mb-1">
-                        Focus: {session.metrics.next_primary_focus}
+                      <p className="text-xs text-gray-300 mb-2 flex items-center gap-2">
+                        <span className="text-purple-400">🎯</span> {session.metrics.next_primary_focus}
                       </p>
                       {session.achievements.length > 0 && (
-                        <div className="flex gap-1 flex-wrap">
+                        <div className="flex gap-2 flex-wrap">
                           {session.achievements.map((achievement, idx) => (
                             <span
                               key={idx}
@@ -335,16 +341,20 @@ export default function Home() {
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-sm">No sessions yet.</p>
+                <div className="text-center py-8">
+                  <p className="text-gray-500 text-base flex flex-col items-center gap-2">
+                    <span className="text-4xl">📈</span>
+                    No session data yet.
+                  </p>
+                </div>
               )}
             </div>
 
             {/* Comparison: Initial vs Current */}
             {initialBenchmark && currentMetrics && (
-              <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <span className="text-2xl">📈</span>
-                  Growth
+              <div className="bg-gradient-to-br from-gray-900/60 via-slate-900/60 to-gray-900/60 backdrop-blur-lg rounded-2xl p-6 shadow-xl">
+                <h3 className="text-xl font-bold mb-5 pb-4 border-b border-gray-700/30 flex items-center gap-3">
+                  <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">Growth Comparison</span>
                 </h3>
                 <div className="space-y-3">
                   <div>
@@ -369,8 +379,10 @@ export default function Home() {
         </div>
 
         {/* Footer */}
-        <footer className="mt-12 text-center text-gray-500 text-sm">
-          <p>Powered by Gemini 2.5 Flash Native Audio • Modern RP Coaching</p>
+        <footer className="mt-12 text-center">
+          <p className="text-[10px] italic text-gray-400">
+            Powered by Gemini 2.5 Flash Native Audio • Modern RP Coaching
+          </p>
         </footer>
       </div>
     </div>

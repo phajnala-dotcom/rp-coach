@@ -14,7 +14,8 @@
 
 body {
   color: var(--foreground);
-  background: var(--background);
+  background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #2d1b3d 100%);
+  min-height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
@@ -28,7 +29,81 @@ body {
   }
 }
 
-/* Voice Orb Animation */
+/* UK-Themed Voice Orb */
+.uk-orb {
+  position: relative;
+  background: linear-gradient(135deg, #002868 0%, #c8102e 50%, #ffffff 100%);
+  animation: ukGlow 3s ease-in-out infinite;
+  box-shadow: 
+    0 0 60px rgba(200, 16, 46, 0.4),
+    0 0 100px rgba(0, 40, 104, 0.3),
+    inset 0 0 80px rgba(255, 255, 255, 0.1);
+}
+
+.uk-orb-listening {
+  animation: ukGlowActive 1.5s ease-in-out infinite;
+  box-shadow: 
+    0 0 80px rgba(200, 16, 46, 0.6),
+    0 0 120px rgba(0, 40, 104, 0.5),
+    0 0 160px rgba(255, 255, 255, 0.3),
+    inset 0 0 100px rgba(255, 255, 255, 0.2);
+}
+
+@keyframes ukGlow {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.02) rotate(1deg);
+    filter: brightness(1.1);
+  }
+}
+
+@keyframes ukGlowActive {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    box-shadow: 
+      0 0 80px rgba(200, 16, 46, 0.6),
+      0 0 120px rgba(0, 40, 104, 0.5),
+      0 0 160px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    transform: scale(1.08) rotate(-1deg);
+    box-shadow: 
+      0 0 100px rgba(200, 16, 46, 0.8),
+      0 0 140px rgba(0, 40, 104, 0.7),
+      0 0 200px rgba(255, 255, 255, 0.5);
+  }
+}
+
+.uk-flag-overlay {
+  display: none;
+}
+
+/* Premium Button Effect */
+.button-premium {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.button-premium::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.button-premium:hover::before {
+  left: 100%;
+}
+
+/* Legacy animations for compatibility */
 @keyframes pulse {
   0%, 100% {
     transform: scale(1);

@@ -28,17 +28,6 @@ export interface SessionHistory {
 
 export interface UserProfile {
   name: string;
-  age: number;
-  occupation: string;
-  company: string;
-  location: string;
-  country: string;
-  marital_status: string;
-  family: {
-    spouse: string;
-    children: Array<{ name: string; age: number }>;
-  };
-  native_language: string;
   coach_name: string;
 }
 
@@ -63,21 +52,10 @@ export const STORAGE_KEYS = {
   USER_PROFILE: 'RP_USER_PROFILE',
 } as const;
 
-// Default User Profile - Peter
+// Default User Profile
 export const DEFAULT_USER_PROFILE: UserProfile = {
   name: 'Peter',
-  age: 54,
-  occupation: 'HR Director',
-  company: 'KINEX BEARINGS',
-  location: 'Nova Dubnica',
-  country: 'Slovakia',
-  marital_status: 'married',
-  family: {
-    spouse: 'Viera',
-    children: [
-      { name: 'Peter', age: 24 },
-      { name: 'Veronika', age: 17 },
-    ],
+  coach_name: 'Steve',
   },
   native_language: 'Slovak',
   coach_name: 'Steve',
