@@ -3,6 +3,28 @@
 import { useLiveRPCoach } from '@/hooks/useLiveRPCoach';
 import { DEFAULT_USER_PROFILE, STORAGE_KEYS } from '@/types';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+
+const SettingsIcon = () => (
+  <svg 
+    className="w-6 h-6" 
+    fill="none" 
+    stroke="currentColor" 
+    viewBox="0 0 24 24" 
+    strokeWidth={2}
+  >
+    <path 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" 
+    />
+    <path 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" 
+    />
+  </svg>
+);
 
 export default function Home() {
   const {
@@ -61,6 +83,18 @@ export default function Home() {
 
   return (
     <div className="min-h-screen p-6 md:p-12">
+      {/* Settings Icon - Only visible on home page (when not connected) */}
+      {!isConnected && (
+        <Link href="/settings">
+          <button
+            className="fixed top-6 right-6 z-50 p-3 bg-gradient-to-br from-gray-800/80 to-gray-900/80 hover:from-gray-700/80 hover:to-gray-800/80 backdrop-blur-lg rounded-xl text-white transition-all transform hover:scale-110 shadow-xl"
+            aria-label="Settings"
+          >
+            <SettingsIcon />
+          </button>
+        </Link>
+      )}
+      
       <div className="max-w-7xl mx-auto">
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -331,6 +331,12 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
     });
     activeAudioSourcesRef.current = [];
 
+    // Get settings from localStorage
+    const voiceName = (typeof window !== 'undefined' && localStorage.getItem(STORAGE_KEYS.VOICE_PREFERENCE)) || 'Enceladus';
+    const temperature = (typeof window !== 'undefined' && localStorage.getItem(STORAGE_KEYS.TEMPERATURE)) 
+      ? parseFloat(localStorage.getItem(STORAGE_KEYS.TEMPERATURE)!) 
+      : 1.0;
+
     isConnectingRef.current = true;
 
     return new Promise<WebSocket>((resolve, reject) => {
@@ -343,13 +349,14 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
         // Send setup message
         ws.send(JSON.stringify({
           setup: {
-            model: 'models/gemini-2.5-flash-native-audio-preview-12-2025',
+            model: 'models/gemini-2.5-flash-native-audio-preview-09-2025',
             generationConfig: {
               responseModalities: ['AUDIO'],
+              temperature: temperature,
               speechConfig: {
                 voiceConfig: {
                   prebuiltVoiceConfig: {
-                    voiceName: 'Enceladus',
+                    voiceName: voiceName,
                   },
                 },
               },
@@ -360,9 +367,9 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
           },
         }));
 
-        // Send initial trigger to make Steve start speaking first
+        // Send initial trigger to make Alex start speaking first
         setTimeout(() => {
-          console.log('📢 Sending initial trigger for Steve to greet...');
+          console.log('📢 Sending initial trigger for Alex to greet...');
           ws.send(JSON.stringify({
             clientContent: {
               turns: [
@@ -642,6 +649,12 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
       currentSessionIdRef.current = sessionId;
       sessionStartTimeRef.current = new Date();
 
+      // Get settings from localStorage
+      const voiceName = localStorage.getItem(STORAGE_KEYS.VOICE_PREFERENCE) || 'Enceladus';
+      const temperature = localStorage.getItem(STORAGE_KEYS.TEMPERATURE) 
+        ? parseFloat(localStorage.getItem(STORAGE_KEYS.TEMPERATURE)!) 
+        : 1.0;
+
       // Get session config from API
       const response = await fetch('/api/session', {
         method: 'POST',
@@ -649,6 +662,8 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
         body: JSON.stringify({
           metrics,
           userProfile: DEFAULT_USER_PROFILE,
+          temperature,
+          voiceName,
         }),
       });
 

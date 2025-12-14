@@ -50,10 +50,49 @@ export const STORAGE_KEYS = {
   CURRENT_STATUS: 'RP_CURRENT_STATUS',
   SESSION_HISTORY: 'RP_SESSION_HISTORY',
   USER_PROFILE: 'RP_USER_PROFILE',
+  VOICE_PREFERENCE: 'RP_VOICE_PREFERENCE',
+  TEMPERATURE: 'RP_TEMPERATURE',
+  CUSTOM_PROMPT: 'RP_CUSTOM_PROMPT',
 } as const;
+
+// Voice Options (30 voices from Gemini API, alphabetically sorted)
+export const VOICE_OPTIONS = [
+  'Achernar',
+  'Achird',
+  'Algenib',
+  'Algieba',
+  'Alnilam',
+  'Aoede',
+  'Autonoe',
+  'Callirrhoe',
+  'Charon',
+  'Despina',
+  'Enceladus',
+  'Erinome',
+  'Fenrir',
+  'Gacrux',
+  'Iapetus',
+  'Kore',
+  'Laomedeia',
+  'Leda',
+  'Orus',
+  'Pulcherrima',
+  'Puck',
+  'Rasalgethi',
+  'Sadachbia',
+  'Sadaltager',
+  'Schedar',
+  'Sulafat',
+  'Umbriel',
+  'Vindemiatrix',
+  'Zephyr',
+  'Zubenelgenubi',
+] as const;
+
+export type VoiceName = typeof VOICE_OPTIONS[number];
 
 // Default User Profile
 export const DEFAULT_USER_PROFILE: UserProfile = {
   name: 'Peter',
-  coach_name: 'Steve',
+  coach_name: 'Alex',
 };

@@ -5,7 +5,7 @@ Real-time Modern RP (Received Pronunciation) voice coaching app powered by Gemin
 ## 🎯 Features
 
 - **Full-Duplex Voice Coaching**: Real-time bidirectional audio with Gemini's native Server-Side VAD
-- **Personalized Learning**: Steve, your AI coach, knows your name, background, and progress
+- **Personalized Learning**: Alex, your AI coach, knows your name, background, and progress
 - **Continuity Between Sessions**: Automatic tracking of your pronunciation journey
 - **Progress Dashboard**: Visual feedback on accuracy, mastery, and growth over time
 - **Session History**: Review past sessions and achievements
@@ -46,7 +46,7 @@ Make sure to allow microphone access when prompted by your browser.
 
 ### The 3-Part Dynamic System Prompt
 
-1. **User Profile Block**: Steve knows you're Peter, 54, HR Director at KINEX BEARINGS in Slovakia
+1. **User Profile Block**: Alex knows you're Peter, 54, HR Director at KINEX BEARINGS in Slovakia
 2. **Dynamic Data Block**: 
    - First session: Benchmark mode (diagnostic interview)
    - Returning sessions: Continuous mode (focused drills based on previous metrics)
@@ -73,7 +73,7 @@ All progress is stored locally in your browser:
 
 1. Click "Start Coaching Session"
 2. Allow microphone access
-3. Speak naturally with Steve
+3. Speak naturally with Alex
 4. Receive real-time pronunciation feedback
 5. Watch your progress improve over time
 6. Use "Save Checkpoint" to manually save progress
@@ -90,7 +90,7 @@ All progress is stored locally in your browser:
 
 ### Voice Configuration
 
-The app uses the "Puck" voice (British English) for Steve. To change:
+The app uses the "Puck" voice (British English) for Alex. To change:
 
 Edit `src/hooks/useLiveRPCoach.ts`:
 ```typescript

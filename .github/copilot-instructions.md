@@ -10,7 +10,7 @@
 
 ### 2. Prompt Builder (`src/lib/prompt-builder.ts`)
 **3-Part Dynamic System Instruction:**
-- **Part 0**: User Profile Block - Steve knows Peter's name, age, job, family (Viera, Peter 24, Veronika 17)
+- **Part 0**: User Profile Block - Alex knows Peter's name, age, job, family (Viera, Peter 24, Veronika 17)
 - **Part 1**: Meta-Instruction - Data processing mandate
 - **Part 2**: Dynamic Data Block
   - Benchmark Mode (first session): Diagnostic interview
@@ -21,7 +21,7 @@
 - Fetches Gemini API key from environment
 - Builds system instruction based on current metrics
 - Returns configuration for WebSocket connection
-- Model: `gemini-2.5-flash-native-audio`
+- Model: `gemini-2.5-flash-native-audio-preview-09-2025`
 
 ### 4. Live Hook (`src/hooks/useLiveRPCoach.ts`)
 - Full-duplex WebSocket connection to Gemini Multimodal Live API
@@ -66,14 +66,14 @@
 ## How It Works
 
 1. **First Session (Benchmark)**:
-   - Steve conducts 3-5 minute diagnostic
+   - Alex conducts 3-5 minute diagnostic
    - Identifies Slovak → English interference patterns
    - Establishes baseline metrics
    - Saves as `RP_INITIAL_BENCHMARK`
 
 2. **Subsequent Sessions (Continuous)**:
    - Loads previous metrics
-   - Steve greets Peter, acknowledges progress
+   - Alex greets Peter, acknowledges progress
    - Focuses on `next_primary_focus` from previous session
    - Drills until 85% accuracy → shifts to secondary focus
    - Updates metrics in real-time
@@ -85,7 +85,7 @@
 
 ## Key Improvements Implemented
 
-✅ User personalization (Steve + Peter)
+✅ User personalization (Alex + Peter)
 ✅ Enhanced metrics with confidence scores
 ✅ Session history tracking (last 10 sessions)
 ✅ Reconnection logic

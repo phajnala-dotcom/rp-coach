@@ -135,3 +135,75 @@ body {
 .orb-listening {
   animation: listening 1.5s ease-in-out infinite;
 }
+
+/* Custom Range Slider Styling */
+input[type="range"].slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  z-index: 10;
+}
+
+/* Webkit/Blink Browsers (Chrome, Safari, Edge) */
+input[type="range"].slider-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  border: 4px solid rgb(59 130 246);
+  cursor: grab;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
+  z-index: 20;
+}
+
+input[type="range"].slider-thumb::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.2);
+}
+
+input[type="range"].slider-thumb::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1);
+}
+
+/* Firefox */
+input[type="range"].slider-thumb::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  border: 4px solid rgb(59 130 246);
+  cursor: grab;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+input[type="range"].slider-thumb::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.2);
+}
+
+input[type="range"].slider-thumb::-moz-range-thumb:active {
+  cursor: grabbing;
+  transform: scale(1);
+}
+
+/* Track styling - Webkit */
+input[type="range"].slider-thumb::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 9999px;
+  background: transparent;
+}
+
+/* Track styling - Firefox */
+input[type="range"].slider-thumb::-moz-range-track {
+  height: 10px;
+  border-radius: 9999px;
+  background: transparent;
+}

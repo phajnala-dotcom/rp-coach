@@ -1,13 +1,9 @@
-// ============================================================================
-// SESSION API ROUTE - Gemini 2.5 Flash Native Audio Setup
-// ============================================================================
-
 import { NextRequest, NextResponse } from 'next/server';
 import { buildSystemInstruction, generateSessionId } from '@/lib/prompt-builder';
-import { SessionMetrics, DEFAULT_USER_PROFILE } from '@/types';
+import { SessionMetrics, DEFAULT_USER_PROFILE, STORAGE_KEYS } from '@/types';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const MODEL = 'gemini-2.5-flash-native-audio-preview-12-2025';
+const MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { metrics, userProfile } = body;
+    const { metrics, userProfile, temperature, voiceName } = body;
 
     // Build system instruction
     const systemInstruction = buildSystemInstruction(
@@ -40,6 +36,8 @@ export async function POST(request: NextRequest) {
       config: {
         model: MODEL,
         apiKey: GEMINI_API_KEY,
+        temperature: temperature ?? 1.0,
+        voiceName: voiceName || 'Enceladus',
       },
     });
   } catch (error) {

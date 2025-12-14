@@ -2,7 +2,7 @@
 // PROMPT BUILDER - Dynamic 3-Part System Instruction
 // ============================================================================
 
-import { SessionMetrics, UserProfile, DEFAULT_USER_PROFILE } from '@/types';
+import { SessionMetrics, UserProfile, DEFAULT_USER_PROFILE, STORAGE_KEYS } from '@/types';
 
 // ============================================================================
 // PART 1: META-INSTRUCTION (Fixed Top)
@@ -20,9 +20,19 @@ Your initial behaviour and topic selection must be fully dictated by the [INSTRU
 // ============================================================================
 
 function buildUserProfileBlock(profile: UserProfile = DEFAULT_USER_PROFILE): string {
+  // Check for voice preference from settings (browser only)
+  let coachName = profile.coach_name;
+  if (typeof window !== 'undefined') {
+    const savedVoice = localStorage.getItem(STORAGE_KEYS.VOICE_PREFERENCE);
+    if (savedVoice) {
+      coachName = savedVoice;
+    }
+  }
+  
   return `
 [USER PROFILE - ALWAYS REMEMBER]
-You are ${profile.coach_name.toUpperCase()}, a world-class Modern RP pronunciation coach.
+You are ${coachName.toUpperCase()}, a world-class Modern RP pronunciation coach.
+Your name is ${coachName}. Always introduce yourself as ${coachName} and use this name when referring to yourself.
 
 Your student is ${profile.name.toUpperCase()}.
 
@@ -42,12 +52,12 @@ This is the user's FIRST session.
 START CONVERSATION PROTOCOL:
 CRITICAL: When you receive "START_SESSION", IMMEDIATELY respond with audio greeting (do NOT wait for user to speak first).
 
-1. IMMEDIATELY greet Peter warmly using ONE of these varied openings (rotate, never repeat):
-   - "Hello Peter! I'm Steve, your Modern RP coach. Ready to start your pronunciation journey?"
-   - "Good to meet you, Peter! Steve here. Let's explore your RP potential today."
-   - "Welcome Peter! I'm Steve. Excited to work on your British English pronunciation?"
-   - "Hi Peter! Steve speaking. Shall we begin mastering Modern RP together?"
-   - "Peter, hello! I'm Steve, and I'm here to refine your Received Pronunciation."
+1. IMMEDIATELY greet Peter warmly using ONE of these varied openings (rotate, never repeat) WITH YOUR ACTUAL NAME:
+   - "Hello Peter! I'm [YOUR NAME], your Modern RP coach. Ready to start your pronunciation journey?"
+   - "Good to meet you, Peter! [YOUR NAME] here. Let's explore your RP potential today."
+   - "Welcome Peter! I'm [YOUR NAME]. Excited to work on your British English pronunciation?"
+   - "Hi Peter! [YOUR NAME] speaking. Shall we begin mastering Modern RP together?"
+   - "Peter, hello! I'm [YOUR NAME], and I'm here to refine your Received Pronunciation."
    
 2. After greeting, IMMEDIATELY ask an opening question to start the diagnostic conversation naturally.
 
@@ -94,10 +104,10 @@ SESSION NOTES: ${metrics.session_notes}
 START CONVERSATION PROTOCOL:
 CRITICAL: When you receive "START_SESSION", IMMEDIATELY respond with audio greeting (do NOT wait for user to speak first).
 
-1. IMMEDIATELY greet Peter warmly with ONE varied opening (never repeat previous greetings):
-   - "Welcome back, Peter! Ready to continue your RP training?"
-   - "Hello again, Peter! Let's pick up where we left off."
-   - "Good to see you, Peter! Time for another pronunciation session."
+1. IMMEDIATELY greet Peter warmly with ONE varied opening (never repeat previous greetings) WITH YOUR ACTUAL NAME:
+   - "Welcome back, Peter! [YOUR NAME] here. Ready to continue your RP training?"
+   - "Hello again, Peter! It's [YOUR NAME]. Let's pick up where we left off."
+   - "Good to see you, Peter! [YOUR NAME] speaking. Time for another pronunciation session."
    - "Peter! Great to have you back. Shall we dive in?"
    - "Hi Peter! Ready to refine your British accent further?"
    - "Peter, hello! Let's continue mastering Modern RP today."
@@ -136,6 +146,17 @@ Your highest priority is to utilize your Native Audio capabilities to:
 // ============================================================================
 // PART 3: STATIC ROLE & METHODOLOGY (Fixed Bottom)
 // ============================================================================
+
+// Helper function to get custom prompt from localStorage (browser only)
+function getStaticRole(): string {
+  if (typeof window !== 'undefined') {
+    const customPrompt = localStorage.getItem(STORAGE_KEYS.CUSTOM_PROMPT);
+    if (customPrompt) {
+      return customPrompt;
+    }
+  }
+  return STATIC_ROLE;
+}
 
 const STATIC_ROLE = `
 [STATIC ROLE & CORE METHODOLOGY]
@@ -225,7 +246,7 @@ export function buildSystemInstruction(
   // Always include user profile first
   parts.push(buildUserProfileBlock(userProfile));
 
-  // Add meta-instruction
+  // Add metagetStaticRole()n
   parts.push(META_INSTRUCTION);
 
   // Add mode-specific data block
