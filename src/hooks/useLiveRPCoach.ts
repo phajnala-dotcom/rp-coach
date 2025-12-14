@@ -29,6 +29,7 @@ interface UseLiveRPCoachReturn {
   stopSession: () => void;
   saveCheckpoint: () => void;
   clearHistory: () => void;
+  isGeneratingReport: boolean;
 }
 
 export function useLiveRPCoach(): UseLiveRPCoachReturn {
@@ -42,6 +43,7 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
   const [currentMetrics, setCurrentMetrics] = useState<SessionMetrics | null>(null);
   const [sessionHistory, setSessionHistory] = useState<SessionHistory[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   // Refs
   const wsRef = useRef<WebSocket | null>(null);
@@ -55,6 +57,7 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
   const isConnectingRef = useRef(false); // Prevent multiple simultaneous connections
   const activeAudioSourcesRef = useRef<AudioBufferSourceNode[]>([]); // Track active playback
   const audioScheduleTimeRef = useRef<number>(0); // Track when next audio should play
+  const shouldGenerateReportRef = useRef(false); // Track if report should be generated on session end
 
   // ============================================================================
   // STORAGE HELPERS
@@ -154,14 +157,15 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
       audioStreamRef.current = stream;
 
       // Create audio context (iOS Safari requires user interaction)
+      // Use default sample rate (typically 48kHz) for best quality
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioContextClass) {
         throw new Error('Web Audio API not supported on this browser');
       }
 
       const audioContext = new AudioContextClass({ 
-        sampleRate: 16000,
-        // iOS optimization
+        // Don't force 16kHz - use system default (48kHz) for better quality
+        // We'll resample the input for Gemini
         latencyHint: 'interactive',
       });
       
@@ -176,17 +180,35 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
       const source = audioContext.createMediaStreamSource(stream);
       
       // Create script processor for audio chunks
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      // Use larger buffer for better quality (less distortion)
+      const processor = audioContext.createScriptProcessor(8192, 1, 1);
       
       processor.onaudioprocess = (e) => {
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
 
         const inputData = e.inputBuffer.getChannelData(0);
+        const inputSampleRate = e.inputBuffer.sampleRate;
         
-        // Convert Float32Array to Int16Array (PCM16)
-        const pcmData = new Int16Array(inputData.length);
-        for (let i = 0; i < inputData.length; i++) {
-          const s = Math.max(-1, Math.min(1, inputData[i]));
+        // Resample to 16kHz for Gemini if needed
+        let processedData: Float32Array;
+        if (inputSampleRate !== 16000) {
+          // Simple downsampling (for quality, use proper resampling)
+          const ratio = inputSampleRate / 16000;
+          const outputLength = Math.floor(inputData.length / ratio);
+          processedData = new Float32Array(outputLength);
+          
+          for (let i = 0; i < outputLength; i++) {
+            const srcIndex = Math.floor(i * ratio);
+            processedData[i] = inputData[srcIndex];
+          }
+        } else {
+          processedData = inputData;
+        }
+        
+        // Convert Float32Array to Int16Array (PCM16) with proper clamping
+        const pcmData = new Int16Array(processedData.length);
+        for (let i = 0; i < processedData.length; i++) {
+          const s = Math.max(-1, Math.min(1, processedData[i]));
           pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
 
@@ -281,6 +303,26 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
             },
           },
         }));
+
+        // Send initial trigger to make Steve start speaking first
+        setTimeout(() => {
+          console.log('📢 Sending initial trigger for Steve to greet...');
+          ws.send(JSON.stringify({
+            clientContent: {
+              turns: [
+                {
+                  role: 'user',
+                  parts: [
+                    {
+                      text: 'START_SESSION'
+                    }
+                  ]
+                }
+              ],
+              turnComplete: true
+            }
+          }));
+        }, 500); // Small delay to ensure setup is complete
 
         setIsConnected(true);
         setConnectionStatus({
@@ -425,12 +467,19 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
 
   const playAudioResponse = useCallback(async (base64Audio: string) => {
     try {
-      if (!audioContextRef.current) return;
+      console.log('🔊 Attempting to play audio response...');
+      if (!audioContextRef.current) {
+        console.error('❌ AudioContext not initialized');
+        return;
+      }
 
       // Resume AudioContext if suspended (required for iOS)
       if (audioContextRef.current.state === 'suspended') {
+        console.log('▶️ Resuming suspended AudioContext...');
         await audioContextRef.current.resume();
       }
+      
+      console.log('✅ AudioContext state:', audioContextRef.current.state);
 
       // Decode base64 to binary
       const binaryString = atob(base64Audio);
@@ -441,8 +490,9 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
 
       // Convert to Int16Array (PCM16)
       const pcm16 = new Int16Array(bytes.buffer);
+      console.log(`🎵 Audio data: ${pcm16.length} samples`);
       
-      // Create audio buffer (24kHz from Gemini)
+      // Gemini sends 24kHz audio - use it directly for best quality
       const sampleRate = 24000;
       const audioBuffer = audioContextRef.current.createBuffer(
         1, // mono
@@ -450,10 +500,11 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
         sampleRate
       );
 
-      // Convert Int16 to Float32 for Web Audio API
+      // Convert Int16 to Float32 with proper normalization
       const channelData = audioBuffer.getChannelData(0);
       for (let i = 0; i < pcm16.length; i++) {
-        channelData[i] = pcm16[i] / 32768.0; // Normalize to -1.0 to 1.0
+        // Proper conversion: divide by 32768.0 for values, not 32767
+        channelData[i] = pcm16[i] / 32768.0;
       }
 
       // Calculate when to start this audio chunk
@@ -462,6 +513,8 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
       
       // Update schedule time for next chunk
       audioScheduleTimeRef.current = startTime + audioBuffer.duration;
+      
+      console.log(`⏰ Playing audio at ${startTime.toFixed(2)}s (duration: ${audioBuffer.duration.toFixed(2)}s)`);
 
       // Play the audio at scheduled time
       const source = audioContextRef.current.createBufferSource();
@@ -550,7 +603,7 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
     }
   }, [connectWebSocket, setupAudio]);
 
-  const stopSession = useCallback(() => {
+  const stopSession = useCallback(async () => {
     console.log('Stopping session...');
     
     // Stop all active audio immediately
@@ -564,6 +617,170 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
     if (sessionStartTimeRef.current && currentMetrics) {
       const duration = (Date.now() - sessionStartTimeRef.current.getTime()) / 1000;
       saveSessionToHistory(currentMetrics, duration);
+    }
+
+    // Generate report if requested
+    if (shouldGenerateReportRef.current && currentMetrics) {
+      setIsGeneratingReport(true);
+      shouldGenerateReportRef.current = false;
+      
+      try {
+        const initialBenchmarkStr = localStorage.getItem(STORAGE_KEYS.INITIAL_BENCHMARK);
+        const initialBenchmark = initialBenchmarkStr ? JSON.parse(initialBenchmarkStr) : null;
+        
+        const isFirstReport = !initialBenchmark;
+        const reportDate = new Date().toLocaleString('en-GB', { 
+          dateStyle: 'full', 
+          timeStyle: 'short' 
+        });
+
+        let reportContent = '';
+
+        if (isFirstReport) {
+          // INITIAL BENCHMARK REPORT
+          reportContent = `
+╔═══════════════════════════════════════════════════════════════╗
+║          MODERN RP PRONUNCIATION - INITIAL BENCHMARK          ║
+╚═══════════════════════════════════════════════════════════════╝
+
+Student: ${DEFAULT_USER_PROFILE.name}
+Date: ${reportDate}
+Coach: ${DEFAULT_USER_PROFILE.coach_name}
+Session ID: ${currentMetrics.session_id}
+Session Duration: ${Math.round((Date.now() - (sessionStartTimeRef.current?.getTime() || Date.now())) / 60000)} minutes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  BASELINE ASSESSMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 RP PROFICIENCY LEVEL: ${currentMetrics.rp_level}
+
+🎯 ACCURACY METRICS:
+   Overall Accuracy:        ${currentMetrics.current_accuracy}%
+   Assessment Confidence:   ${currentMetrics.confidence_score}%
+
+🗣️ PRONUNCIATION ANALYSIS:
+   Primary Challenge:       ${currentMetrics.next_primary_focus}
+   Secondary Challenge:     ${currentMetrics.next_secondary_focus}
+   
+❌ IDENTIFIED ERRORS:
+   ${currentMetrics.residual_error}
+
+🎵 PROSODY ASSESSMENT:
+   Intonation Issues:       ${currentMetrics.prosody_gaps}
+   Pitch Variance:          ${currentMetrics.pitch_variance}
+
+📝 SESSION NOTES:
+   ${currentMetrics.session_notes}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TRAINING ROADMAP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Next Session Focus:
+1. Primary:   ${currentMetrics.next_primary_focus}
+2. Secondary: ${currentMetrics.next_secondary_focus}
+
+This baseline establishes your starting point. All future progress
+reports will measure improvement against these initial metrics.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Generated by RP Native Coach • Powered by Gemini 2.5 Flash
+`;
+        } else {
+          // PROGRESS REPORT
+          const accuracyGain = currentMetrics.current_accuracy - initialBenchmark.current_accuracy;
+          const confidenceGain = currentMetrics.confidence_score - initialBenchmark.confidence_score;
+          const levelImproved = currentMetrics.rp_level !== initialBenchmark.rp_level;
+          const sessionCount = sessionHistory.length + 1;
+          
+          reportContent = `
+╔═══════════════════════════════════════════════════════════════╗
+║          MODERN RP PRONUNCIATION - PROGRESS REPORT            ║
+╚═══════════════════════════════════════════════════════════════╝
+
+Student: ${DEFAULT_USER_PROFILE.name}
+Date: ${reportDate}
+Session #${sessionCount}
+Session ID: ${currentMetrics.session_id}
+Session Duration: ${Math.round((Date.now() - (sessionStartTimeRef.current?.getTime() || Date.now())) / 60000)} minutes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PROGRESS OVERVIEW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 RP LEVEL:
+   Initial:  ${initialBenchmark.rp_level}
+   Current:  ${currentMetrics.rp_level} ${levelImproved ? '✅ IMPROVED!' : ''}
+
+🎯 ACCURACY METRICS:
+   Initial Accuracy:    ${initialBenchmark.current_accuracy}%
+   Current Accuracy:    ${currentMetrics.current_accuracy}%
+   Progress:            ${accuracyGain >= 0 ? '+' : ''}${accuracyGain.toFixed(1)}% ${accuracyGain > 5 ? '🎉' : accuracyGain > 0 ? '📈' : ''}
+   
+   Initial Confidence:  ${initialBenchmark.confidence_score}%
+   Current Confidence:  ${currentMetrics.confidence_score}%
+   Progress:            ${confidenceGain >= 0 ? '+' : ''}${confidenceGain.toFixed(1)}%
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CURRENT SESSION FOCUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 Working On:
+   ${currentMetrics.previous_focus}
+   Status: ${currentMetrics.mastery_confirmed ? '✅ MASTERED' : `${currentMetrics.current_accuracy}% accuracy`}
+
+❌ Remaining Challenges:
+   ${currentMetrics.residual_error}
+
+🎵 Prosody Status:
+   ${currentMetrics.prosody_gaps}
+   Pitch Variance: ${currentMetrics.pitch_variance}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  NEXT SESSION TARGETS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Primary:   ${currentMetrics.next_primary_focus}
+2. Secondary: ${currentMetrics.next_secondary_focus}
+
+📝 Coach Notes:
+   ${currentMetrics.session_notes}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ACHIEVEMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${sessionHistory.filter(s => s.achievements.length > 0).map(s => 
+  `• ${new Date(s.date).toLocaleDateString('en-GB')}: ${s.achievements.join(', ')}`
+).join('\n') || 'No mastered elements yet - keep practicing!'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Generated by RP Native Coach • Powered by Gemini 2.5 Flash
+`;
+        }
+
+        // Create downloadable text file (works on iPhone)
+        const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = isFirstReport 
+          ? `RP-Initial-Benchmark-${DEFAULT_USER_PROFILE.name}.txt`
+          : `RP-Progress-Report-${new Date().toISOString().split('T')[0]}.txt`;
+        
+        link.click();
+        URL.revokeObjectURL(url);
+        
+        console.log(isFirstReport ? 'Initial benchmark report generated' : 'Progress report generated');
+        
+      } catch (err) {
+        console.error('Failed to generate report:', err);
+      } finally {
+        setIsGeneratingReport(false);
+      }
     }
 
     // Close WebSocket
@@ -594,11 +811,14 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
   }, [cleanupAudio, currentMetrics, saveSessionToHistory]);
 
   const saveCheckpoint = useCallback(() => {
-    if (currentMetrics) {
-      saveToStorage(currentMetrics);
-      console.log('Checkpoint saved');
+    if (!isConnected) {
+      setError('Start a session first');
+      return;
     }
-  }, [currentMetrics, saveToStorage]);
+    
+    shouldGenerateReportRef.current = true;
+    console.log('Report will be generated when session ends');
+  }, [isConnected]);
 
   const clearHistory = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -638,5 +858,6 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
     stopSession,
     saveCheckpoint,
     clearHistory,
+    isGeneratingReport,
   };
 }
