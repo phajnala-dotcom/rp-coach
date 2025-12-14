@@ -2,7 +2,7 @@
 
 ## Current State Summary
 - **Tech Stack**: Next.js 16.0.10, TypeScript, Tailwind CSS, Gemini 2.5 Flash Native Audio
-- **Model**: `gemini-2.5-flash-native-audio-preview-12-2025`
+- **Model**: `gemini-2.5-flash-native-audio-preview-09-2025`
 - **Current Voice**: Enceladus (hardcoded)
 - **UI Theme**: UK flag design, British colors, 264x264px flag with blurred border
 - **Key Files**:
@@ -50,7 +50,7 @@
 
 **Implementation**:
 - Dropdown menu with voice names only (no adjectives)
-- Selected voice name replaces "Steve" in system prompt
+- Selected voice name replaces "Alex" in system prompt
 - Store selection in localStorage: `RP_VOICE_PREFERENCE`
 - Update `buildUserProfileBlock()` in `src/lib/prompt-builder.ts` to use selected voice as `coach_name`
 
@@ -83,7 +83,7 @@
 ## Technical Notes
 
 ### Current Prompt Structure (3 parts):
-1. **Part 0**: User Profile Block - uses `profile.coach_name` (currently "Steve")
+1. **Part 0**: User Profile Block - uses `profile.coach_name` (currently "Alex")
 2. **Part 1**: Meta-Instruction (fixed)
 3. **Part 2**: Dynamic Data Block (benchmark vs continuous mode)
 4. **Part 3**: Static Role & Methodology (STATIC_ROLE constant)
