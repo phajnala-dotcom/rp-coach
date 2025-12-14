@@ -17,6 +17,7 @@ export default function Home() {
     saveCheckpoint,
     clearHistory,
     isGeneratingReport,
+    audioLevel,
   } = useLiveRPCoach();
 
   const [sessionDuration, setSessionDuration] = useState(0);
@@ -118,12 +119,31 @@ export default function Home() {
                 </div>
               ) : (
                 // Active Session
-                <div className="text-center space-y-10">
-                  {/* Animated UK Flag Orb */}
-                  <div className="relative w-72 h-72 mx-auto">
-                    <div className={`uk-orb ${isRecording ? 'uk-orb-listening' : ''} w-full h-full rounded-full flex items-center justify-center overflow-hidden`}>
+                <div className="text-center space-y-8">
+                  {/* UK Flag - Matching Home Page Exactly */}
+                  <div className="relative w-[264px] h-[264px] mx-auto" style={{marginTop: '-60px'}}>
+                    {/* Blurred border - matching home page */}
+                    <div className="absolute inset-0 rounded-full" style={{
+                      background: `radial-gradient(circle, rgba(0,40,104,${0.4 + audioLevel * 0.004}) 0%, rgba(200,16,46,${0.3 + audioLevel * 0.003}) 50%, transparent 100%)`,
+                      filter: `blur(${20 + audioLevel * 0.5}px)`,
+                      transform: 'scale(1.2)',
+                      transition: 'background 0.1s ease-out, filter 0.1s ease-out'
+                    }} />
+                    <div 
+                      className="w-full h-full rounded-full flex items-center justify-center overflow-hidden relative z-10"
+                      style={{
+                        background: 'linear-gradient(135deg, #002868 0%, #c8102e 50%, #ffffff 100%)',
+                        boxShadow: `
+                          0 0 ${60 + audioLevel * 0.8}px rgba(200, 16, 46, ${0.4 + audioLevel * 0.006}),
+                          0 0 ${100 + audioLevel * 1.2}px rgba(0, 40, 104, ${0.3 + audioLevel * 0.005}),
+                          inset 0 0 80px rgba(255, 255, 255, 0.1)
+                        `,
+                        transform: `scale(${1 + audioLevel * 0.002})`,
+                        transition: 'transform 0.1s ease-out, box-shadow 0.1s ease-out'
+                      }}
+                    >
                       {/* Union Jack SVG */}
-                      <svg className="w-60 h-60 absolute" viewBox="0 0 60 30" xmlns="http://www.w3.org/2000/svg" opacity="0.4">
+                      <svg className="w-[230px] h-[230px] absolute" viewBox="0 0 60 30" xmlns="http://www.w3.org/2000/svg">
                         <rect width="60" height="30" fill="#012169"/>
                         <path d="M 0,0 L 60,30 M 60,0 L 0,30" stroke="#FFF" strokeWidth="6"/>
                         <path d="M 0,0 L 60,30 M 60,0 L 0,30" stroke="#C8102E" strokeWidth="4"/>
@@ -156,16 +176,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <p className="text-3xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                      {isRecording ? '🎤 Listening to you...' : '🤔 Steve is thinking...'}
-                    </p>
-                    <p className="text-gray-300 text-base">
-                      {isRecording ? 'Speak naturally' : 'Processing your pronunciation'}
-                    </p>
-                  </div>
-
-                  <div className="flex gap-6 justify-center">
+                  <div className="flex gap-6 justify-center" style={{marginTop: '50px'}}>
                     <button
                       onClick={saveCheckpoint}
                       disabled={!isConnected}

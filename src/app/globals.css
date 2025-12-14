@@ -38,6 +38,8 @@ body {
     0 0 60px rgba(200, 16, 46, 0.4),
     0 0 100px rgba(0, 40, 104, 0.3),
     inset 0 0 80px rgba(255, 255, 255, 0.1);
+  will-change: transform, box-shadow;
+  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
 }
 
 .uk-orb-listening {
@@ -47,6 +49,8 @@ body {
     0 0 120px rgba(0, 40, 104, 0.5),
     0 0 160px rgba(255, 255, 255, 0.3),
     inset 0 0 100px rgba(255, 255, 255, 0.2);
+  will-change: transform, box-shadow;
+  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
 }
 
 @keyframes ukGlow {

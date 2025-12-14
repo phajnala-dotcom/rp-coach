@@ -56,7 +56,4 @@ export const STORAGE_KEYS = {
 export const DEFAULT_USER_PROFILE: UserProfile = {
   name: 'Peter',
   coach_name: 'Steve',
-  },
-  native_language: 'Slovak',
-  coach_name: 'Steve',
 };
