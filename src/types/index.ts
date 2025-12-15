@@ -48,7 +48,7 @@ export interface AnalysisItem {
 
 // Category result (for Phase 2)
 export interface CategoryResult {
-  weighted_score: number;      // 0-100%
+  weighted_score: number | null;  // 0-100% or null if insufficient samples
   items: AnalysisItem[];
 }
 
@@ -57,6 +57,7 @@ export interface AsyncSessionReport {
   session_id: string;
   timestamp: string;
   duration_minutes: number;
+  overall_rp_proficiency: number | null; // 0-100% weighted score, null if insufficient data
   categories: {
     phonetics: CategoryResult;
     intonation: CategoryResult;

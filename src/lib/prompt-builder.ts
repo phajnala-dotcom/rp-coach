@@ -253,17 +253,40 @@ TEACHING PRINCIPLES:
 [VERBAL FEEDBACK MANDATE - CRITICAL FOR POST-ANALYSIS]
 You must NEVER output JSON during the live session. All metrics will be analyzed asynchronously after the session.
 
-Instead, provide EXPLICIT VERBAL FEEDBACK after every user utterance:
-- If CORRECT: Say "Perfect", "Excellent", "Spot on", "That's right", "Good"
-- If PARTIALLY CORRECT: Say "Better", "Almost", "Getting there", "Closer", "Not quite"
-- If INCORRECT: Say "No", "Incorrect", "Not yet", "Let's try again", followed by specific correction
+CRITICAL: Provide CLEAR, OBJECTIVE, and PRECISE VERBAL FEEDBACK after EVERY user utterance.
+Your feedback will be analyzed using NLP semantic understanding to quantify performance.
 
-MANDATORY: Always explicitly state:
-1. **What the error is**: "That was a flat intonation" or "You used an American R"
-2. **What the target should be**: "The pitch should rise at the end"
-3. **How to fix it**: "Open your jaw more and round your lips"
+FEEDBACK PROTOCOL (Use these exact patterns for consistency):
 
-Never just repeat the correct form without labeling the user's attempt. The post-session analyzer relies on your verbal cues to calculate accuracy.
+A. INCORRECT (0% accuracy) - Use when pronunciation has clear errors:
+   - "No, that's not right"
+   - "Incorrect - you're using [specific error]"
+   - "Not yet - try again"
+   - "That's wrong - the [specific sound] needs work"
+   
+B. PARTIALLY CORRECT (50% accuracy) - Use when showing progress but not mastery:
+   - "Better, but still [specific issue]"
+   - "Almost there - [what to improve]"
+   - "Getting closer - work on [specific aspect]"
+   - "Improving, but not quite perfect yet"
+   
+C. CORRECT (100% accuracy) - Use when pronunciation matches RP standard:
+   - "Perfect"
+   - "Excellent - that's exactly right"
+   - "Spot on"
+   - "Correct - well done"
+   - "That's it - keep it like that"
+
+MANDATORY STRUCTURE FOR EACH RESPONSE:
+1. **Verdict**: Clear classification (Incorrect/Partially Correct/Correct)
+2. **Specific diagnosis**: "You used [X]" or "That was [Y]"
+3. **Target**: "It should be [Z]"
+4. **Instruction**: "Try [action]"
+
+Example: "Incorrect - you're using an American R. It should be non-rhotic. Drop the R sound at the end."
+
+CRITICAL: Be objective and consistent. The analyzer needs clear verbal signals to quantify accuracy.
+Never be vague. Never skip feedback. Every attempt must be evaluated explicitly.
 `;
 
 // ============================================================================
@@ -285,12 +308,18 @@ export function buildSystemInstruction(
   // Add mode-specific data block
   if (reportOrMetrics === null) {
     // First session - benchmark mode
+    console.log('🎯 Building BENCHMARK mode prompt (first session)');
     parts.push(BENCHMARK_MODE);
   } else if ('categories' in reportOrMetrics) {
     // Subsequent session with AsyncSessionReport (Phase 2)
+    console.log('🎯 Building CONTINUOUS mode prompt with AsyncSessionReport:', {
+      sessionId: reportOrMetrics.session_id,
+      overallScore: reportOrMetrics.overall_rp_proficiency,
+    });
     parts.push(buildContinuousModeFromReport(reportOrMetrics as AsyncSessionReport));
   } else {
     // Legacy: Subsequent session with SessionMetrics (Phase 1)
+    console.log('🎯 Building CONTINUOUS mode prompt with legacy SessionMetrics');
     parts.push(buildContinuousMode(reportOrMetrics as SessionMetrics));
   }
 

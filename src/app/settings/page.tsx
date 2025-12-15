@@ -69,7 +69,7 @@ const SettingsIcon = () => (
 export default function Settings() {
   const router = useRouter();
   const [voice, setVoice] = useState<VoiceName>('Enceladus');
-  const [temperature, setTemperature] = useState<number>(1.0);
+  const [temperature, setTemperature] = useState<number>(0.6);
   const [customPrompt, setCustomPrompt] = useState<string>(DEFAULT_STATIC_ROLE);
   const [originalPrompt, setOriginalPrompt] = useState<string>(DEFAULT_STATIC_ROLE);
   const [hasChanges, setHasChanges] = useState<boolean>(false);

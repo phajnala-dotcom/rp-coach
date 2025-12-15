@@ -36,15 +36,16 @@ export default function Home() {
     error,
     startSession,
     stopSession,
-    saveCheckpoint,
     clearHistory,
     isGeneratingReport,
     audioLevel,
     transcriptLog,
+    lastReport,
   } = useLiveRPCoach();
 
   const [sessionDuration, setSessionDuration] = useState(0);
   const [initialBenchmark, setInitialBenchmark] = useState<any>(null);
+  const [lastOverallScore, setLastOverallScore] = useState<number | null>(null);
 
   // Session timer
   useEffect(() => {
@@ -60,15 +61,28 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isConnected]);
 
-  // Load initial benchmark
+  // Load initial benchmark and last overall score
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const benchmark = localStorage.getItem(STORAGE_KEYS.INITIAL_BENCHMARK);
       if (benchmark) {
         setInitialBenchmark(JSON.parse(benchmark));
       }
+      
+      const lastReportStr = localStorage.getItem(STORAGE_KEYS.LAST_SESSION_REPORT);
+      if (lastReportStr) {
+        const report = JSON.parse(lastReportStr);
+        setLastOverallScore(report.overall_rp_proficiency);
+      }
     }
   }, []);
+
+  // Update score when new report is generated
+  useEffect(() => {
+    if (lastReport?.overall_rp_proficiency !== undefined) {
+      setLastOverallScore(lastReport.overall_rp_proficiency);
+    }
+  }, [lastReport]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -151,6 +165,22 @@ export default function Home() {
                   >
                     🎙️ Begin RP Coaching
                   </button>
+
+                  {/* Last Overall Score Visualization */}
+                  {lastOverallScore !== null && (
+                    <div className="mt-6 text-center">
+                      <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-gray-800/50 to-gray-900/50 rounded-2xl border border-gray-700/50 backdrop-blur-sm">
+                        <span className="text-gray-300 text-lg font-medium">Last Session RP Proficiency:</span>
+                        <span className={`text-3xl font-black ${
+                          lastOverallScore >= 71 ? 'text-green-400' :
+                          lastOverallScore >= 41 ? 'text-yellow-400' :
+                          'text-red-400'
+                        }`}>
+                          {lastOverallScore}%
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 // Active Session
@@ -213,26 +243,15 @@ export default function Home() {
 
                   <div className="flex gap-6 justify-center" style={{marginTop: '50px'}}>
                     <button
-                      onClick={saveCheckpoint}
-                      disabled={!isConnected}
-                      className="button-premium px-[38px] py-[19px] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-2xl text-xl font-black transition-all transform hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg hover:shadow-emerald-500/50 border-4 border-emerald-400/40 hover:translate-y-[-2px] active:translate-y-0"
-                      style={{
-                        textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                        boxShadow: '0 8px 16px rgba(16, 185, 129, 0.3), 0 4px 6px rgba(0, 0, 0, 0.3), inset 0 -2px 0 rgba(0, 0, 0, 0.2)'
-                      }}
-                    >
-                      📋 Mark for Report
-                    </button>
-                    <button
                       onClick={stopSession}
                       disabled={isGeneratingReport}
-                      className="button-premium px-[38px] py-[19px] bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 rounded-2xl text-xl font-black transition-all transform hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg hover:shadow-rose-500/50 border-4 border-rose-400/40 hover:translate-y-[-2px] active:translate-y-0"
+                      className="button-premium px-36 py-[19px] bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 rounded-2xl text-5xl font-black transition-all transform hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg hover:shadow-rose-500/50 border-4 border-rose-400/40 hover:translate-y-[-2px] active:translate-y-0"
                       style={{
                         textShadow: '0 2px 4px rgba(0,0,0,0.3)',
                         boxShadow: '0 8px 16px rgba(244, 63, 94, 0.3), 0 4px 6px rgba(0, 0, 0, 0.3), inset 0 -2px 0 rgba(0, 0, 0, 0.2)'
                       }}
                     >
-                      {isGeneratingReport ? '📄 Generating...' : '⏹️ End Session'}
+                      {isGeneratingReport ? '📄 Analyzing...' : '⏹️ End Session'}
                     </button>
                   </div>
                 </div>

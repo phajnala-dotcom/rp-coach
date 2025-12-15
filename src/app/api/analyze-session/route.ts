@@ -42,10 +42,19 @@ export async function POST(request: NextRequest) {
       session_id: sessionId,
       timestamp: new Date().toISOString(),
       duration_minutes: duration,
+      overall_rp_proficiency: analysisResult.overall_rp_proficiency ?? null,
       categories: analysisResult.categories,
       qualitative_notes: analysisResult.qualitative_notes,
       next_session_recommendation: analysisResult.next_session_recommendation,
     };
+
+    console.log('✅ Analysis complete:', {
+      sessionId,
+      overallScore: report.overall_rp_proficiency,
+      phoneticsScore: report.categories.phonetics.weighted_score,
+      intonationScore: report.categories.intonation.weighted_score,
+      stressScore: report.categories.stress_rhythm.weighted_score,
+    });
 
     return NextResponse.json({ success: true, report });
   } catch (error) {
@@ -76,34 +85,95 @@ function calculateDuration(log: TranscriptEntry[]): number {
 
 async function analyzeTranscript(transcriptText: string): Promise<Partial<AsyncSessionReport>> {
   const ANALYZER_PROMPT = `
-ROLE: Forensic Linguistics Analyst (British RP)
+ROLE: Forensic Linguistics Analyst (British RP) with NLP Capabilities
 INPUT: Coaching session transcript between ALEX (coach) and PETER (student)
-TASK: Quantify PETER's pronunciation performance based on ALEX's verbal feedback
+TASK: Quantify PETER's pronunciation performance using NATURAL LANGUAGE PROCESSING to semantically analyze ALEX's varied feedback
+
+CRITICAL: Use NLP semantic understanding, NOT exact string matching. Alex's feedback is natural, conversational, and varied.
 
 METHODOLOGY & CALCULATIONS:
 
 1. EXTRACT DRILLS:
    - Scan for utterances where ALEX corrects PETER
-   - Assign PERCENTAGE SCORE based on ALEX's verbal reaction:
-     * "Incorrect" / "No" / "Not yet" / "Wrong" / Explicit correction given = 0%
-     * "Better" / "Almost" / "Getting there" / "Closer" / "Not quite" / "Partial" = 50%
-     * "Perfect" / "Excellent" / "Spot on" / "Correct" / "Good" / "That's right" = 100%
+   - Use SEMANTIC UNDERSTANDING to classify feedback (NOT exact string matching)
+   
+   SEMANTIC CLASSIFICATION RULES:
+   
+   A. INCORRECT (0%) - Negative feedback or explicit correction:
+      - Direct negatives: "No", "Incorrect", "Not yet", "Wrong", "Not quite"
+      - Corrections given: "Try again", "Let me hear it again", "That's not right"
+      - Explicit errors pointed out: "You're using American R", "Too much tension"
+      - Comparative negatives: "Still not there", "That's worse"
+   
+   B. PARTIALLY CORRECT (50%) - Mixed feedback or incremental progress:
+      - Progress indicators: "Better", "Getting there", "Closer", "Improving", "Almost"
+      - Qualified praise: "That's better than before", "Much improved", "Nearly perfect"
+      - Conditional approval: "Better, but...", "Good, however...", "On the right track"
+      - Partial success: "The first part was good", "Better on that sound"
+   
+   C. CORRECT (100%) - Positive affirmation or mastery confirmation:
+      - Direct praise: "Perfect", "Excellent", "Spot on", "That's right", "Correct"
+      - Strong affirmations: "Well done", "Brilliant", "Exactly", "Yes", "Good"
+      - Mastery statements: "You've got it", "That's it", "Nailed it", "Beautiful"
+      - Encouraging continuation: "Keep going", "Do that again", "Exactly like that"
+      - Natural variations: "That was perfect", "It was correct this time", "Much better now"
+   
+   CRITICAL: Focus on INTENT and SENTIMENT, not exact phrases. Alex's feedback is natural and varied.
+   
+   COUNTING ATTEMPTS:
+   - Count EVERY instance where PETER attempts a sound/word/pattern and ALEX responds with feedback
+   - Include attempts even if feedback is indirect or conversational
+   - Example: If PETER says "car" 6 times and ALEX responds each time, that's 6 attempts
+   - DO NOT require exact phrase matching - use semantic understanding of the interaction
 
-2. CATEGORIZE (Strict Priority - DO NOT mix categories):
-   I. PHONETICS (Individual sounds only):
-      - Examples: "/r/", "/ɔː/", "/θ/", "/ð/", "/æ/", "/ʌ/"
+2. CATEGORIZE WITH HOLISTIC AUDITORY EVALUATION:
+   CRITICAL: Extract ALL explicitly drilled deviations from Modern RP standard.
+   
+   I. PHONETICS (Individual sounds - SMART EXTRACTION):
+      - **SHORT WORDS (1-2 syllables, ≤6 letters)**: Extract 1-2 phonemes
+        * Example: "rare" → /r/ and /eə/ (2 phonemes)
+        * Example: "car" → /r/ only (1 phoneme)
+        * Example: "thought" → /θ/ and /ɔː/ (2 phonemes)
+      
+      - **LONG WORDS (3+ syllables, >6 letters)**: Extract 2-3 phonemes
+        * Example: "sustainability" → /s/, /eɪ/, /ɪ/ (3 phonemes)
+        * Example: "photograph" → /əʊ/ and /ɑː/ (2 phonemes)
+      
+      - **RULE**: Only extract phonemes EXPLICITLY corrected by Alex
       - Use IPA notation where possible
       
-   II. INTONATION (Pitch patterns - use TYPES to save tokens):
+   II. INTONATION (Pitch patterns - NEVER on single-syllable words):
       - Types: "Wh-Question", "Yes/No Question", "Statement", "Conditional Sentence", 
                "Emotion: Surprise", "Emotion: Sadness", "List Intonation"
       - DO NOT quote full sentences
+      - Example: "rare" → NO intonation drill (single syllable)
+      - Example: "sustainability" → 1 intonation drill if Alex corrected pitch pattern
       
-   III. STRESS & RHYTHM (Word stress and rhythm patterns):
+   III. STRESS & RHYTHM (Word stress patterns - ONLY for multi-syllable words):
       - Specific words: "Photograph", "Photography", "Photographic"
       - Pattern types: "Iambic", "Trochaic", "Weak Forms", "Connected Speech"
+      - Example: "rare" → NO stress pattern drill (single syllable)
+      - Example: "sustainability" → 1 stress pattern drill if Alex corrected emphasis
 
-3. CALCULATE SCORES (CRITICAL - Follow exact formula):
+3. DATA QUALITY THRESHOLDS (CRITICAL - ENFORCE STRICTLY):
+   
+   A. MINIMUM ATTEMPTS PER PRACTICE ITEM:
+      - Each practice item (phoneme/intonation/stress) MUST have ≥3 attempts
+      - If <3 attempts → EXCLUDE from category calculation
+      - Mark as "INSUFFICIENT_DATA" in notes
+   
+   B. MINIMUM PRACTICE ITEMS PER CATEGORY:
+      - Each category MUST have ≥3 valid practice items (with ≥3 attempts each)
+      - If <3 valid practice items → Set category weighted_score = null
+      - Mark category as "INSUFFICIENT_DATA" in notes
+   
+   C. OVERALL SCORE CALCULATION:
+      - Requires ALL 3 categories to have valid weighted_score (not null)
+      - If ANY category is null → Set overall_rp_proficiency = null
+      - Formula: (phonetics × 0.60) + (intonation × 0.20) + (stress_rhythm × 0.20)
+      - Weights: 60% Phonetics, 20% Intonation, 20% Stress & Rhythm
+
+4. CALCULATE SCORES (Follow exact formula):
    
    A. Item Score Calculation:
       - For each specific item (e.g., "/r/" or "Wh-Question"):
@@ -117,7 +187,7 @@ METHODOLOGY & CALCULATIONS:
       - Multiply each item score by its attempt count
       - Sum all weighted scores
       - Divide by total attempts across all items in category
-      - Result: 0-100%
+      - Result: 0-100% OR null if <3 valid practice items
       - Example:
         * /r/: 40% (5 attempts) → 40 × 5 = 200
         * /ɔː/: 75% (4 attempts) → 75 × 4 = 300
@@ -131,33 +201,69 @@ METHODOLOGY & CALCULATIONS:
 
 OUTPUT FORMAT (Strict JSON - NO markdown, NO extra text):
 {
+  "overall_rp_proficiency": 62,
   "categories": {
     "phonetics": {
       "weighted_score": 55,
       "items": [
         { "name": "/r/", "attempts": 10, "score": 40, "status": "NEEDS_WORK" },
-        { "name": "/ɔː/", "attempts": 5, "score": 80, "status": "GOOD" }
+        { "name": "/ɔː/", "attempts": 5, "score": 80, "status": "GOOD" },
+        { "name": "/θ/", "attempts": 3, "score": 67, "status": "IMPROVING" }
       ]
     },
     "intonation": {
       "weighted_score": 67,
       "items": [
         { "name": "Wh-Question", "attempts": 3, "score": 100, "status": "MASTERED" },
-        { "name": "Yes/No Question", "attempts": 4, "score": 50, "status": "IMPROVING" }
+        { "name": "Yes/No Question", "attempts": 4, "score": 50, "status": "IMPROVING" },
+        { "name": "Statement", "attempts": 5, "score": 60, "status": "IMPROVING" }
       ]
     },
     "stress_rhythm": {
-      "weighted_score": 0,
-      "items": []
+      "weighted_score": null,
+      "items": [
+        { "name": "Photograph", "attempts": 2, "score": 50, "status": "INSUFFICIENT_DATA" }
+      ]
     }
   },
-  "qualitative_notes": "Brief summary: Peter struggles with non-rhotic R, showing 40% accuracy. /ɔː/ vowel is improving (80%). Intonation on Wh-questions is mastered, but Yes/No questions need work.",
+  "qualitative_notes": "Peter struggles with non-rhotic R (40%). /ɔː/ vowel is improving (80%). Wh-questions mastered. Stress & rhythm category needs more practice (<3 different drills completed). Overall score not calculated due to limited stress_rhythm practice.",
   "next_session_recommendation": {
     "primary_focus": "Non-rhotic /r/ in word-final position",
-    "secondary_focus": "Yes/No question rising intonation",
+    "secondary_focus": "Word stress patterns in multi-syllable words",
     "warmup_topic": "Minimal pairs: car vs cah, far vs fah"
   }
 }
+
+NOTE: In the example above, overall_rp_proficiency would be null (not 62) because stress_rhythm has insufficient data.
+
+EXAMPLE SEMANTIC ANALYSIS (How to interpret varied feedback):
+
+Transcript excerpt:
+PETER: "car"
+ALEX: "Not quite. You're still using an American R."
+→ Score: 0% (explicit correction)
+
+PETER: "car"
+ALEX: "Better, but the R is still there."
+→ Score: 50% (progress indicator with qualification)
+
+PETER: "car"
+ALEX: "That's it! Much better now."
+→ Score: 100% (strong affirmation + positive)
+
+PETER: "car"
+ALEX: "Perfect. That was excellent."
+→ Score: 100% (direct praise)
+
+PETER: "car"
+ALEX: "You've got it this time!"
+→ Score: 100% (mastery statement)
+
+PETER: "car"
+ALEX: "Almost there, keep practicing."
+→ Score: 50% (progress but not mastery)
+
+Result for /r/ sound: 6 attempts, scores [0, 50, 100, 100, 100, 50] = 400/6 = 67%
 
 CRITICAL RULES:
 - Calculate weighted_score EXACTLY as described (weighted mean, not simple average)
@@ -180,7 +286,7 @@ CRITICAL RULES:
           }]
         }],
         generationConfig: {
-          temperature: 0.1, // Low temperature for consistent analysis
+          temperature: 0.4, // Balanced for semantic nuance while maintaining classification consistency
           responseMimeType: 'application/json',
         },
       }),

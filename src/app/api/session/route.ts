@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       config: {
         model: MODEL,
         apiKey: GEMINI_API_KEY,
-        temperature: temperature ?? 1.0,
+        temperature: temperature ?? 0.6,
         voiceName: voiceName || 'Enceladus',
       },
     });
