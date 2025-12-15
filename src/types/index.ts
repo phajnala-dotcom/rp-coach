@@ -31,6 +31,45 @@ export interface UserProfile {
   coach_name: string;
 }
 
+// Transcript entry for logging
+export interface TranscriptEntry {
+  timestamp: number;           // Unix timestamp
+  speaker: 'user' | 'model';   // Who spoke
+  text: string;                // What was said
+}
+
+// Analysis item (for Phase 2)
+export interface AnalysisItem {
+  name: string;                // e.g., "/r/" or "Wh-Question"
+  attempts: number;
+  score: number;               // 0-100%
+  status: 'NEEDS_WORK' | 'IMPROVING' | 'GOOD' | 'MASTERED';
+}
+
+// Category result (for Phase 2)
+export interface CategoryResult {
+  weighted_score: number;      // 0-100%
+  items: AnalysisItem[];
+}
+
+// Async session report (for Phase 2)
+export interface AsyncSessionReport {
+  session_id: string;
+  timestamp: string;
+  duration_minutes: number;
+  categories: {
+    phonetics: CategoryResult;
+    intonation: CategoryResult;
+    stress_rhythm: CategoryResult;
+  };
+  qualitative_notes: string;
+  next_session_recommendation: {
+    primary_focus: string;
+    secondary_focus: string;
+    warmup_topic: string;
+  };
+}
+
 export interface MetricsUpdate {
   metrics_update?: SessionMetrics;
   trigger_event?: 'NONE' | 'SHIFT_FOCUS' | 'BENCHMARK_COMPLETE' | 'SESSION_END';
@@ -53,6 +92,8 @@ export const STORAGE_KEYS = {
   VOICE_PREFERENCE: 'RP_VOICE_PREFERENCE',
   TEMPERATURE: 'RP_TEMPERATURE',
   CUSTOM_PROMPT: 'RP_CUSTOM_PROMPT',
+  TRANSCRIPT_LOG: 'RP_TRANSCRIPT_LOG',           // New: Session transcript
+  LAST_SESSION_REPORT: 'RP_LAST_SESSION_REPORT', // New: For Phase 2
 } as const;
 
 // Voice Options (30 voices from Gemini API, alphabetically sorted)
