@@ -41,13 +41,17 @@ export default function Home() {
     audioLevel,
     transcriptLog,
     lastReport,
+    isMuted,
+    isPaused,
+    toggleMute,
+    togglePause,
   } = useLiveRPCoach();
 
   const [sessionDuration, setSessionDuration] = useState(0);
   const [initialBenchmark, setInitialBenchmark] = useState<any>(null);
   const [lastOverallScore, setLastOverallScore] = useState<number | null>(null);
 
-  // Session timer
+  // Session timer (pause-aware)
   useEffect(() => {
     if (!isConnected) {
       setSessionDuration(0);
@@ -55,11 +59,13 @@ export default function Home() {
     }
 
     const interval = setInterval(() => {
-      setSessionDuration(prev => prev + 1);
+      if (!isPaused) {
+        setSessionDuration(prev => prev + 1);
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isConnected]);
+  }, [isConnected, isPaused]);
 
   // Load initial benchmark and last overall score
   useEffect(() => {
@@ -185,6 +191,21 @@ export default function Home() {
               ) : (
                 // Active Session
                 <div className="text-center space-y-8">
+                  
+                  {/* Session Status Indicators */}
+                  <div className="flex gap-4 justify-center items-center mb-4">
+                    {isPaused && (
+                      <div className="px-6 py-3 bg-yellow-600/80 backdrop-blur-lg rounded-xl text-white font-bold text-lg shadow-lg border-2 border-yellow-400/50 animate-pulse">
+                        ⏸️ SESSION PAUSED
+                      </div>
+                    )}
+                    {isMuted && (
+                      <div className="px-6 py-3 bg-red-600/80 backdrop-blur-lg rounded-xl text-white font-bold text-lg shadow-lg border-2 border-red-400/50">
+                        🔇 MIC MUTED
+                      </div>
+                    )}
+                  </div>
+
                   {/* UK Flag - Matching Home Page Exactly */}
                   <div className="relative w-[264px] h-[264px] mx-auto" style={{marginTop: '-60px'}}>
                     {/* Blurred border - matching home page */}
@@ -241,7 +262,35 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="flex gap-6 justify-center" style={{marginTop: '50px'}}>
+                  {/* Session Control Buttons */}
+                  <div className="flex flex-col gap-4 justify-center" style={{marginTop: '50px'}}>
+                    
+                    {/* Mic Mute and Pause buttons */}
+                    <div className="flex gap-4 justify-center">
+                      <button
+                        onClick={toggleMute}
+                        className={`px-8 py-4 rounded-xl text-lg font-bold transition-all transform hover:scale-105 shadow-lg ${
+                          isMuted 
+                            ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white' 
+                            : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white'
+                        }`}
+                      >
+                        {isMuted ? '🔇 Unmute Mic' : '🎤 Mute Mic'}
+                      </button>
+
+                      <button
+                        onClick={togglePause}
+                        className={`px-8 py-4 rounded-xl text-lg font-bold transition-all transform hover:scale-105 shadow-lg ${
+                          isPaused
+                            ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white'
+                            : 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white'
+                        }`}
+                      >
+                        {isPaused ? '▶️ Resume' : '⏸️ Pause'}
+                      </button>
+                    </div>
+
+                    {/* End Session button */}
                     <button
                       onClick={stopSession}
                       disabled={isGeneratingReport}
