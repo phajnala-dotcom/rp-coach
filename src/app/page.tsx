@@ -40,6 +40,7 @@ export default function Home() {
     clearHistory,
     isGeneratingReport,
     audioLevel,
+    transcriptLog,
   } = useLiveRPCoach();
 
   const [sessionDuration, setSessionDuration] = useState(0);
@@ -271,6 +272,34 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Transcript Viewer - Debug Tool (Phase 1) */}
+            {isConnected && transcriptLog.length > 0 && (
+              <details className="bg-gradient-to-br from-gray-900/60 via-slate-900/60 to-gray-900/60 backdrop-blur-lg rounded-2xl p-6 shadow-xl">
+                <summary className="cursor-pointer font-bold text-lg mb-4 flex items-center gap-3 hover:text-blue-400 transition-colors">
+                  <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                    📝 Transcript ({transcriptLog.length} entries)
+                  </span>
+                </summary>
+                <div className="mt-4 max-h-60 overflow-y-auto space-y-1 text-sm">
+                  {transcriptLog.slice(-20).map((entry, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-2 rounded-lg ${
+                        entry.speaker === 'user' 
+                          ? 'bg-blue-900/30 border-l-4 border-blue-500' 
+                          : 'bg-green-900/30 border-l-4 border-green-500'
+                      }`}
+                    >
+                      <span className="font-semibold">
+                        {entry.speaker === 'user' ? `${DEFAULT_USER_PROFILE.name}` : `${DEFAULT_USER_PROFILE.coach_name}`}:
+                      </span>{' '}
+                      <span className="text-gray-300">{entry.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
             )}
           </div>
 
