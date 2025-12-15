@@ -32,12 +32,19 @@ export async function POST(request: NextRequest) {
     // Call Gemini API for analysis
     const analysisResult = await analyzeTranscript(transcriptText);
 
+    // Ensure all required fields are present
+    if (!analysisResult.categories || !analysisResult.qualitative_notes || !analysisResult.next_session_recommendation) {
+      throw new Error('Incomplete analysis result from Gemini');
+    }
+
     // Build final report
     const report: AsyncSessionReport = {
       session_id: sessionId,
       timestamp: new Date().toISOString(),
       duration_minutes: duration,
-      ...analysisResult,
+      categories: analysisResult.categories,
+      qualitative_notes: analysisResult.qualitative_notes,
+      next_session_recommendation: analysisResult.next_session_recommendation,
     };
 
     return NextResponse.json({ success: true, report });
