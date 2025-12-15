@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildSystemInstruction, generateSessionId } from '@/lib/prompt-builder';
-import { SessionMetrics, DEFAULT_USER_PROFILE, STORAGE_KEYS } from '@/types';
+import { SessionMetrics, AsyncSessionReport, DEFAULT_USER_PROFILE, STORAGE_KEYS } from '@/types';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
@@ -17,16 +17,19 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { metrics, userProfile, temperature, voiceName } = body;
+    const { metrics, lastReport, userProfile, temperature, voiceName } = body;
+
+    // Prefer AsyncSessionReport over legacy SessionMetrics
+    const reportOrMetrics = lastReport || metrics || null;
 
     // Build system instruction
     const systemInstruction = buildSystemInstruction(
-      metrics as SessionMetrics | null,
+      reportOrMetrics as AsyncSessionReport | SessionMetrics | null,
       userProfile || DEFAULT_USER_PROFILE
     );
 
     // Generate session ID if not provided
-    const sessionId = metrics?.session_id || generateSessionId();
+    const sessionId = lastReport?.session_id || metrics?.session_id || generateSessionId();
 
     // Return configuration for client
     return NextResponse.json({

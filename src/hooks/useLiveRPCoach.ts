@@ -662,7 +662,11 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
         await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay for cleanup
       }
 
-      // Load current metrics from storage
+      // Load last session report from storage (Phase 2)
+      const lastReportStr = localStorage.getItem(STORAGE_KEYS.LAST_SESSION_REPORT);
+      const lastReport = lastReportStr ? JSON.parse(lastReportStr) : null;
+      
+      // Fallback to legacy metrics if no report exists (Phase 1 compatibility)
       const storedMetrics = localStorage.getItem(STORAGE_KEYS.CURRENT_STATUS);
       const metrics = storedMetrics ? JSON.parse(storedMetrics) : null;
 
@@ -677,12 +681,13 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
         ? parseFloat(localStorage.getItem(STORAGE_KEYS.TEMPERATURE)!) 
         : 1.0;
 
-      // Get session config from API
+      // Get session config from API (send report if available)
       const response = await fetch('/api/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          metrics,
+          lastReport,       // Phase 2: AsyncSessionReport
+          metrics,          // Phase 1 fallback: SessionMetrics
           userProfile: DEFAULT_USER_PROFILE,
           temperature,
           voiceName,
