@@ -10,6 +10,7 @@ import {
   MetricsUpdate,
   ConnectionStatus,
   SessionHistory,
+  TranscriptEntry,
   STORAGE_KEYS,
   DEFAULT_USER_PROFILE,
 } from '@/types';
@@ -31,6 +32,7 @@ interface UseLiveRPCoachReturn {
   clearHistory: () => void;
   isGeneratingReport: boolean;
   audioLevel: number; // 0-100 for audio visualization
+  transcriptLog: TranscriptEntry[]; // New: Session transcript
 }
 
 export function useLiveRPCoach(): UseLiveRPCoachReturn {
@@ -46,6 +48,7 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0); // 0-100 for audio visualization
+  const [transcriptLog, setTranscriptLog] = useState<TranscriptEntry[]>([]);
 
   // Refs
   const wsRef = useRef<WebSocket | null>(null);
@@ -63,6 +66,7 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
   const inputAnalyserRef = useRef<AnalyserNode | null>(null); // Track input audio levels
   const outputAnalyserRef = useRef<AnalyserNode | null>(null); // Track output audio levels
   const animationFrameRef = useRef<number | null>(null); // For audio level animation loop
+  const transcriptLogRef = useRef<TranscriptEntry[]>([]); // Track transcript entries
 
   // ============================================================================
   // STORAGE HELPERS
@@ -228,6 +232,24 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
             }],
           },
         }));
+        
+        // Log user audio (check if significant audio, not just silence)
+        if (pcmData.length > 0) {
+          const rms = Math.sqrt(
+            processedData.reduce((sum: number, val: number) => sum + val * val, 0) / processedData.length
+          );
+          
+          if (rms > 0.01) { // Threshold for speech detection
+            const entry: TranscriptEntry = {
+              timestamp: Date.now(),
+              speaker: 'user',
+              text: '[AUDIO_DETECTED]', // Placeholder - Phase 2 will add transcription
+            };
+            
+            transcriptLogRef.current = [...transcriptLogRef.current, entry];
+            setTranscriptLog(transcriptLogRef.current);
+          }
+        }
       };
 
       // Create analyser for input audio visualization
@@ -484,9 +506,27 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
       
       if (modelTurn?.parts) {
         modelTurn.parts.forEach((part: any) => {
-          // Handle text responses (metrics updates)
+          // Handle text responses (log to transcript)
           if (part.text) {
-            parseMetricsUpdate(part.text);
+            const serverContent = part.text.trim();
+            if (serverContent) {
+              const entry: TranscriptEntry = {
+                timestamp: Date.now(),
+                speaker: 'model',
+                text: serverContent,
+              };
+              
+              transcriptLogRef.current = [...transcriptLogRef.current, entry];
+              setTranscriptLog(transcriptLogRef.current);
+              
+              // Save to localStorage periodically (every 5 entries)
+              if (transcriptLogRef.current.length % 5 === 0) {
+                localStorage.setItem(
+                  STORAGE_KEYS.TRANSCRIPT_LOG,
+                  JSON.stringify(transcriptLogRef.current)
+                );
+              }
+            }
           }
 
           // Handle audio responses (play back)
@@ -503,30 +543,7 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
     }
   }, []);
 
-  const parseMetricsUpdate = useCallback((text: string) => {
-    try {
-      // Look for JSON in the text
-      const jsonMatch = text.match(/\{[\s\S]*"metrics_update"[\s\S]*\}/);
-      if (!jsonMatch) return;
-
-      const update: MetricsUpdate = JSON.parse(jsonMatch[0]);
-      
-      if (update.metrics_update) {
-        console.log('Metrics update received:', update);
-        saveToStorage(update.metrics_update);
-        metricsUpdateCountRef.current++;
-
-        // Handle trigger events
-        if (update.trigger_event === 'SHIFT_FOCUS') {
-          console.log('Focus shifted to:', update.metrics_update.next_primary_focus);
-        } else if (update.trigger_event === 'BENCHMARK_COMPLETE') {
-          console.log('Benchmark complete');
-        }
-      }
-    } catch (err) {
-      console.error('Failed to parse metrics update:', err);
-    }
-  }, [saveToStorage]);
+  // parseMetricsUpdate removed - Phase 1: No JSON parsing during live sessions
 
   const playAudioResponse = useCallback(async (base64Audio: string) => {
     try {
@@ -700,6 +717,19 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
     activeAudioSourcesRef.current = [];
     audioScheduleTimeRef.current = 0; // Reset audio schedule
 
+    // Save final transcript
+    if (transcriptLogRef.current.length > 0) {
+      localStorage.setItem(
+        STORAGE_KEYS.TRANSCRIPT_LOG,
+        JSON.stringify(transcriptLogRef.current)
+      );
+      console.log(`Session ended. Transcript entries: ${transcriptLogRef.current.length}`);
+    }
+    
+    // Clear transcript for next session
+    transcriptLogRef.current = [];
+    setTranscriptLog([]);
+    
     // Calculate session duration
     if (sessionStartTimeRef.current && currentMetrics) {
       const duration = (Date.now() - sessionStartTimeRef.current.getTime()) / 1000;
@@ -947,5 +977,6 @@ Generated by RP Native Coach • Powered by Gemini 2.5 Flash
     clearHistory,
     isGeneratingReport,
     audioLevel,
+    transcriptLog,
   };
 }
