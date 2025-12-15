@@ -2,7 +2,7 @@
 // PROMPT BUILDER - Dynamic 3-Part System Instruction
 // ============================================================================
 
-import { SessionMetrics, UserProfile, DEFAULT_USER_PROFILE, STORAGE_KEYS } from '@/types';
+import { SessionMetrics, AsyncSessionReport, CategoryResult, UserProfile, DEFAULT_USER_PROFILE, STORAGE_KEYS } from '@/types';
 
 // ============================================================================
 // PART 1: META-INSTRUCTION (Fixed Top)
@@ -82,7 +82,74 @@ BENCHMARK CONVERSATION STARTERS (use AFTER greeting):
 Listen for natural speech, then begin targeted diagnostic questions.
 `;
 
-// Option B: Continuous Mode (Returning User)
+// ============================================================================
+// HELPER FUNCTIONS FOR ASYNC REPORTS
+// ============================================================================
+
+/**
+ * Format category for system prompt injection
+ */
+function formatCategory(name: string, data: CategoryResult): string {
+  if (!data.items || data.items.length === 0) return '';
+  
+  const itemsStr = data.items
+    .map(item => `   - ${item.name}: ${item.score}% (${item.attempts}x) [${item.status}]`)
+    .join('\n');
+  
+  return `\n${name.toUpperCase()} (Weighted Avg: ${data.weighted_score}%):\n${itemsStr}`;
+}
+
+/**
+ * Build continuous mode using AsyncSessionReport (Phase 2)
+ */
+function buildContinuousModeFromReport(report: AsyncSessionReport): string {
+  return `
+[ANALYTIC DATA INPUT: ASYNCHRONOUS REPORT FROM PREVIOUS SESSION]
+
+-- PERFORMANCE MATRIX (PRIORITY ORDER) --
+${formatCategory('1. Phonetics', report.categories.phonetics)}
+${formatCategory('2. Intonation', report.categories.intonation)}
+${formatCategory('3. Stress & Rhythm', report.categories.stress_rhythm)}
+
+-- QUALITATIVE NOTES --
+${report.qualitative_notes}
+
+-- STRATEGY FOR THIS SESSION --
+1. PRIMARY FOCUS: ${report.next_session_recommendation.primary_focus}
+2. SECONDARY FOCUS: ${report.next_session_recommendation.secondary_focus}
+3. WARMUP: ${report.next_session_recommendation.warmup_topic}
+
+-- SESSION PROTOCOL --
+
+START CONVERSATION PROTOCOL:
+CRITICAL: When you receive "START_SESSION", IMMEDIATELY respond with audio greeting (do NOT wait for user to speak first).
+
+1. **BRIEFING (30 seconds max):** 
+   - Greet Peter warmly with ONE varied opening using YOUR ACTUAL NAME
+   - Briefly explain last session's results using the matrix above
+   - Example: "Last time, Phonetics scored ${report.categories.phonetics.weighted_score}% due to [issue], so we'll focus there today"
+
+2. **QUANTIFY:** 
+   - Internally track accuracy for PRIMARY FOCUS on a per-utterance basis
+   - Use same verbal feedback protocol ("Correct", "Incorrect", "Almost")
+
+3. **DRILL:** 
+   - Start drill on PRIMARY FOCUS immediately after briefing
+   - Use minimal pairs, exaggerated articulation, repetition
+   - Provide explicit articulatory instructions
+
+4. **SHIFT CONDITION:** 
+   - If accuracy > 85% over 10+ attempts
+   - IMMEDIATELY shift to SECONDARY FOCUS
+   - Verbally acknowledge the shift: "Great! You've mastered [X]. Let's move to [Y]."
+
+5. **MAINTAIN VERBAL FEEDBACK:**
+   - Continue explicit labeling for post-analysis
+   - Never assume continuity without stating corrections aloud
+`;
+}
+
+// Option B: Continuous Mode (Returning User - Legacy SessionMetrics)
 function buildContinuousMode(metrics: SessionMetrics): string {
   return `
 [ANALYTIC DATA INPUT: PREVIOUS SESSION SUMMARY]
@@ -204,7 +271,7 @@ Never just repeat the correct form without labeling the user's attempt. The post
 // ============================================================================
 
 export function buildSystemInstruction(
-  metrics: SessionMetrics | null,
+  reportOrMetrics: AsyncSessionReport | SessionMetrics | null,
   userProfile: UserProfile = DEFAULT_USER_PROFILE
 ): string {
   const parts: string[] = [];
@@ -212,18 +279,23 @@ export function buildSystemInstruction(
   // Always include user profile first
   parts.push(buildUserProfileBlock(userProfile));
 
-  // Add metagetStaticRole()n
+  // Add meta-instruction
   parts.push(META_INSTRUCTION);
 
   // Add mode-specific data block
-  if (metrics === null) {
+  if (reportOrMetrics === null) {
+    // First session - benchmark mode
     parts.push(BENCHMARK_MODE);
+  } else if ('categories' in reportOrMetrics) {
+    // Subsequent session with AsyncSessionReport (Phase 2)
+    parts.push(buildContinuousModeFromReport(reportOrMetrics as AsyncSessionReport));
   } else {
-    parts.push(buildContinuousMode(metrics));
+    // Legacy: Subsequent session with SessionMetrics (Phase 1)
+    parts.push(buildContinuousMode(reportOrMetrics as SessionMetrics));
   }
 
   // Add static role & methodology
-  parts.push(STATIC_ROLE);
+  parts.push(getStaticRole());
 
   return parts.join('\n\n');
 }
