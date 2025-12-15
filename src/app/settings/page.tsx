@@ -2,43 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import type { ListBoxItemProps } from 'react-aria-components';
-import {
-  Select,
-  SelectValue,
-  Button,
-  Label,
-  Popover,
-  ListBox,
-  ListBoxItem,
-  SearchField,
-  Input,
-  Autocomplete,
-  useFilter,
-} from 'react-aria-components';
 import { STORAGE_KEYS, VOICE_OPTIONS, VoiceName } from '@/types';
-function VoiceSelectItem(props: ListBoxItemProps & { children: string }) {
-  return (
-    <ListBoxItem
-      {...props}
-      textValue={props.children}
-      className="group flex items-center gap-2 cursor-pointer select-none py-2.5 px-4 outline-none rounded-lg text-gray-300 hover:bg-gray-700/60 hover:text-white focus:bg-gradient-to-r focus:from-blue-600/40 focus:to-purple-600/40 focus:text-white selected:bg-gradient-to-r selected:from-blue-600/60 selected:to-purple-600/60 selected:text-white transition-all"
-    >
-      {({ isSelected }) => (
-        <>
-          <span className="flex-1 truncate font-medium">
-            {props.children}
-          </span>
-          {isSelected && (
-            <span className="w-4 h-4 flex items-center justify-center text-blue-400">
-              ✓
-            </span>
-          )}
-        </>
-      )}
-    </ListBoxItem>
-  );
-}
 
 const DEFAULT_STATIC_ROLE = `
 [STATIC ROLE & CORE METHODOLOGY]
@@ -143,10 +107,6 @@ export default function Settings() {
   const [customPrompt, setCustomPrompt] = useState<string>(DEFAULT_STATIC_ROLE);
   const [originalPrompt, setOriginalPrompt] = useState<string>(DEFAULT_STATIC_ROLE);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
-  const { contains } = useFilter({ sensitivity: 'base' });
-
-  // Convert voice options to array of objects for React Aria Select
-  const voiceItems = VOICE_OPTIONS.map(v => ({ id: v, name: v }));
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -167,9 +127,9 @@ export default function Settings() {
     }
   }, []);
 
-
-  const { contains } = useFilter({ sensitivity: 'base' });
-  const voiceItems = VOICE_OPTIONS.map(v => ({ id: v, name: v }));
+  useEffect(() => {
+    setHasChanges(customPrompt !== originalPrompt);
+  }, [customPrompt, originalPrompt]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -214,62 +174,29 @@ export default function Settings() {
           >
             ✕
           </button>
-        {/* Voice Selection - Searchable Select */}
+        </div>
+
+        {/* Voice Selection - Native Select */}
         <div className="mb-8 sm:mb-10">
-          <Select
-            selectedKey={voice}
-            onSelectionChange={(key) => {
-              const selectedVoice = key as VoiceName;
+          <label htmlFor="voice-select" className="block text-base sm:text-lg font-bold mb-3 text-white">
+            Voice Options
+          </label>
+          <select
+            id="voice-select"
+            value={voice}
+            onChange={(e) => {
+              const selectedVoice = e.target.value as VoiceName;
               setVoice(selectedVoice);
               localStorage.setItem(STORAGE_KEYS.VOICE_PREFERENCE, selectedVoice);
             }}
+            className="w-full cursor-pointer rounded-xl bg-gray-800/90 hover:bg-gray-800 backdrop-blur-lg transition py-3 sm:py-3.5 px-4 text-base shadow-lg border border-gray-700/50 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
           >
-            <Label className="block text-base sm:text-lg font-bold mb-3 text-white">
-              Voice Options
-            </Label>
-            <Button className="flex items-center w-full cursor-pointer rounded-xl bg-gray-800/90 hover:bg-gray-800 backdrop-blur-lg transition py-3 sm:py-3.5 px-4 text-base text-left shadow-lg border border-gray-700/50 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50">
-              <SelectValue className="flex-1 truncate font-medium" />
-              <svg className="w-5 h-5 ml-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </Button>
-            <Popover className="w-[--trigger-width] entering:animate-in entering:fade-in exiting:animate-out exiting:fade-out">
-              <div className="max-h-80 flex flex-col rounded-xl bg-gray-800/98 backdrop-blur-2xl shadow-2xl border border-gray-700/50 overflow-hidden">
-                <Autocomplete filter={contains}>
-                  <SearchField
-                    aria-label="Search voices"
-                    autoFocus
-                    className="group flex items-center bg-gray-700/50 border-b-2 border-gray-600/50 focus-within:border-blue-500/50"
-                  >
-                    <svg className="w-4 h-4 ml-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    <Input
-                      placeholder="Search voices..."
-                      className="px-3 py-2.5 flex-1 min-w-0 border-none outline-none bg-transparent text-base text-white placeholder-gray-400"
-                    />
-                    <Button className="text-sm transition rounded-full p-1.5 flex items-center justify-center text-gray-400 bg-transparent hover:bg-gray-600/50 pressed:bg-gray-600 mr-2 w-6 h-6 group-empty:invisible focus:outline-none">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </Button>
-                  </SearchField>
-                  <ListBox
-                    items={voiceItems}
-                    className="outline-none p-2 overflow-y-auto max-h-60"
-                  >
-                    {(item) => (
-                      <VoiceSelectItem key={item.id}>{item.name}</VoiceSelectItem>
-                    )}
-                  </span>
-                </button>
-              ))
-            ) : (
-              <div className="px-4 py-8 text-center text-gray-500">
-                No voices found
-              </div>
-            )}
-          </div>
+            {VOICE_OPTIONS.map((voiceOption) => (
+              <option key={voiceOption} value={voiceOption} className="bg-gray-800 text-white">
+                {voiceOption}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Temperature Slider */}
