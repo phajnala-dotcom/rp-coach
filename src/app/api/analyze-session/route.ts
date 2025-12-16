@@ -101,39 +101,29 @@ METHODOLOGY & CALCULATIONS:
 
 1. EXTRACT DRILLS:
    - Scan for utterances where ALEX corrects PETER
-   - Use SEMANTIC UNDERSTANDING to classify feedback (NOT exact string matching)
+   - Use semantic similarity to classify ALEX's feedback into 3 categories
    
-   SEMANTIC CLASSIFICATION RULES:
+   SEMANTIC CLASSIFICATION (3-Level System):
    
-   A. INCORRECT (0%) - Negative feedback or explicit correction:
-      - Direct negatives: "No", "Incorrect", "Not yet", "Wrong", "Not quite", "Nope"
-      - Corrections given: "Try again", "Let me hear it again", "That's not right", "One more time"
-      - Explicit errors pointed out: "You're using American R", "Too much tension", "Wrong vowel"
-      - Comparative negatives: "Still not there", "That's worse", "Going backwards"
-      - Frustration indicators: "We need to work on this more", "This is still a problem"
-      - Additional examples: "I hear the American influence", "That's still too rhotic", "Missing the mark"
+   Your task: For each ALEX response, determine semantic similarity to these evaluation concepts:
    
-   B. PARTIALLY CORRECT (50%) - Mixed feedback or incremental progress:
-      - Progress indicators: "Better", "Getting there", "Closer", "Improving", "Almost", "Warmer"
-      - Qualified praise: "That's better than before", "Much improved", "Nearly perfect", "Getting closer"
-      - Conditional approval: "Better, but...", "Good, however...", "On the right track, but..."
-      - Partial success: "The first part was good", "Better on that sound", "Half right"
-      - Encouragement with reservation: "You're improving", "I can hear progress", "Not bad"
-      - Additional examples: "That's more like it, but not quite", "Closer to RP", "Progress, keep going"
+   CATEGORY A - INCORRECT (Score: 0%):
+   Semantic concept: "The attempt was wrong, needs correction, explicit error"
    
-   C. CORRECT (100%) - Positive affirmation or mastery confirmation:
-      - Direct praise: "Perfect", "Excellent", "Spot on", "That's right", "Correct", "Yes"
-      - Strong affirmations: "Well done", "Brilliant", "Exactly", "Good", "Lovely", "Wonderful"
-      - Mastery statements: "You've got it", "That's it", "Nailed it", "Beautiful", "Textbook RP"
-      - Encouraging continuation: "Keep going", "Do that again", "Exactly like that", "Maintain that"
-      - Natural variations: "That was perfect", "It was correct this time", "Much better now", "Now you're speaking RP"
-      - Implicit approval: "Right, let's move on", "Good, next one", "Okay, that's fine"
-      - Additional examples: "Native RP speaker right there", "I couldn't tell you apart from BBC", "Flawless"
+   CATEGORY B - PARTIALLY CORRECT (Score: 50%):
+   Semantic concept: "Showing progress, getting better, but not yet perfect"
    
-   CRITICAL: Focus on INTENT and SENTIMENT, not exact phrases. Alex's feedback is natural and varied.
+   CATEGORY C - CORRECT (Score: 100%):
+   Semantic concept: "The attempt was right, successful, approved, mastered"
+   
+   CRITICAL INSTRUCTIONS:
+   - Use your inherent semantic understanding - no phrase matching needed
+   - Classify based on INTENT and MEANING, not specific words
+   - When uncertain, default to the category with closest semantic similarity
+   - If feedback contains mixed signals, weigh the dominant sentiment
    
    COUNTING ATTEMPTS:
-   - Count EVERY instance where PETER attempts a sound/word/pattern and ALEX responds with feedback
+   - Count EVERY instance where PETER attempts a sound/word/pattern and ALEX responds with evaluative feedback
    - Include attempts even if feedback is indirect or conversational
    - Example: If PETER says "car" 6 times and ALEX responds each time, that's 6 attempts
    - DO NOT require exact phrase matching - use semantic understanding of the interaction
