@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       session_id: sessionId,
       timestamp: new Date().toISOString(),
       duration_minutes: duration,
-      overall_rp_proficiency: analysisResult.overall_rp_proficiency ?? null,
+      overall_rp_proficiency: analysisResult.overall_rp_proficiency ?? 0,
       categories: analysisResult.categories,
       qualitative_notes: analysisResult.qualitative_notes,
       next_session_recommendation: analysisResult.next_session_recommendation,
@@ -155,23 +155,20 @@ METHODOLOGY & CALCULATIONS:
       - Example: "rare" → NO stress pattern drill (single syllable)
       - Example: "sustainability" → 1 stress pattern drill if Alex corrected emphasis
 
-3. DATA QUALITY THRESHOLDS (CRITICAL - ENFORCE STRICTLY):
+3. EXERCISE RATIO GUIDANCE FOR ALEX (Next Session Recommendation):
    
-   A. MINIMUM ATTEMPTS PER PRACTICE ITEM:
-      - Each practice item (phoneme/intonation/stress) MUST have ≥3 attempts
-      - If <3 attempts → EXCLUDE from category calculation
-      - Mark as "INSUFFICIENT_DATA" in notes
+   Recommend balanced practice distribution:
+   - For every 3 phoneme drills → suggest 1 intonation exercise + 1 stress pattern exercise
+   - Example: If session had 9 phoneme drills, recommend adding 3 intonation + 3 stress exercises
+   - This ensures comprehensive RP training across all categories
    
-   B. MINIMUM PRACTICE ITEMS PER CATEGORY:
-      - Each category MUST have ≥3 valid practice items (with ≥3 attempts each)
-      - If <3 valid practice items → Set category weighted_score = null
-      - Mark category as "INSUFFICIENT_DATA" in notes
+4. OVERALL SCORE CALCULATION (Simple Average):
    
-   C. OVERALL SCORE CALCULATION:
-      - Requires ALL 3 categories to have valid weighted_score (not null)
-      - If ANY category is null → Set overall_rp_proficiency = null
-      - Formula: (phonetics × 0.60) + (intonation × 0.20) + (stress_rhythm × 0.20)
-      - Weights: 60% Phonetics, 20% Intonation, 20% Stress & Rhythm
+   - Calculate as simple arithmetic mean of all 3 categories
+   - Formula: (phonetics + intonation + stress_rhythm) / 3
+   - ALL practice items count, regardless of number of attempts
+   - Categories always have scores (never null)
+   - If a category has zero drills, its score is 0%
 
 4. CALCULATE SCORES (Follow exact formula):
    
@@ -187,11 +184,20 @@ METHODOLOGY & CALCULATIONS:
       - Multiply each item score by its attempt count
       - Sum all weighted scores
       - Divide by total attempts across all items in category
-      - Result: 0-100% OR null if <3 valid practice items
+      - Result: 0-100% (always a number, never null)
+      - If category has no drills → score = 0%
       - Example:
         * /r/: 40% (5 attempts) → 40 × 5 = 200
         * /ɔː/: 75% (4 attempts) → 75 × 4 = 300
         * Category: (200 + 300) / (5 + 4) = 500/9 = 55.6%
+   
+   C. Result Sorting (CRITICAL - For UI Display):
+      - Sort items array within each category by score ASCENDING:
+      - First: NEEDS_WORK (0-40%)
+      - Second: IMPROVING (41-70%)
+      - Third: GOOD (71-90%)
+      - Fourth: MASTERED (91-100%)
+      - This shows problem areas first for prioritized practice
 
 4. STATUS ASSIGNMENT:
    - 0-40%: "NEEDS_WORK"
@@ -220,21 +226,22 @@ OUTPUT FORMAT (Strict JSON - NO markdown, NO extra text):
       ]
     },
     "stress_rhythm": {
-      "weighted_score": null,
+      "weighted_score": 50,
       "items": [
-        { "name": "Photograph", "attempts": 2, "score": 50, "status": "INSUFFICIENT_DATA" }
+        { "name": "Photograph", "attempts": 2, "score": 50, "status": "IMPROVING" }
       ]
     }
   },
-  "qualitative_notes": "Peter struggles with non-rhotic R (40%). /ɔː/ vowel is improving (80%). Wh-questions mastered. Stress & rhythm category needs more practice (<3 different drills completed). Overall score not calculated due to limited stress_rhythm practice.",
+  "qualitative_notes": "Peter struggles with non-rhotic R (40%, needs work). /ɔː/ vowel is improving (80%, good progress). Wh-questions mastered (100%, excellent). Recommend balancing exercise types: for every 3 phoneme drills, add 1 intonation + 1 stress exercise. Next session should include more pitch pattern and word stress practice.",
   "next_session_recommendation": {
     "primary_focus": "Non-rhotic /r/ in word-final position",
     "secondary_focus": "Word stress patterns in multi-syllable words",
     "warmup_topic": "Minimal pairs: car vs cah, far vs fah"
-  }
+  },
+  "overall_rp_proficiency": 63
 }
 
-NOTE: In the example above, overall_rp_proficiency would be null (not 62) because stress_rhythm has insufficient data.
+NOTE: Overall score calculated as simple average: (62 + 60 + 50) / 3 = 57.3 ≈ 57%. Always includes all categories.
 
 EXAMPLE SEMANTIC ANALYSIS (How to interpret varied feedback):
 

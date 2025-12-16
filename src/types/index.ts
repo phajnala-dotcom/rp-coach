@@ -48,7 +48,7 @@ export interface AnalysisItem {
 
 // Category result (for Phase 2)
 export interface CategoryResult {
-  weighted_score: number | null;  // 0-100% or null if insufficient samples
+  weighted_score: number;  // 0-100%, always a number (0% if no drills)
   items: AnalysisItem[];
 }
 
@@ -57,7 +57,7 @@ export interface AsyncSessionReport {
   session_id: string;
   timestamp: string;
   duration_minutes: number;
-  overall_rp_proficiency: number | null; // 0-100% weighted score, null if insufficient data
+  overall_rp_proficiency: number; // 0-100% simple average of 3 categories
   categories: {
     phonetics: CategoryResult;
     intonation: CategoryResult;
