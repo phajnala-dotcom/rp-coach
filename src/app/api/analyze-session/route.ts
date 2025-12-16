@@ -85,11 +85,17 @@ function calculateDuration(log: TranscriptEntry[]): number {
 
 async function analyzeTranscript(transcriptText: string): Promise<Partial<AsyncSessionReport>> {
   const ANALYZER_PROMPT = `
-ROLE: Forensic Linguistics Analyst (British RP) with NLP Capabilities
-INPUT: Coaching session transcript between ALEX (coach) and PETER (student)
-TASK: Quantify PETER's pronunciation performance using NATURAL LANGUAGE PROCESSING to semantically analyze ALEX's varied feedback
+ROLE: Statistical NLP Analyst & Text Pattern Recognizer
+TASK: Quantify pronunciation practice performance through TEXT ANALYSIS ONLY
 
-CRITICAL: Use NLP semantic understanding, NOT exact string matching. Alex's feedback is natural, conversational, and varied.
+CRITICAL: You analyze TRANSCRIPTS (text), not audio. Focus on:
+- Counting interactions and feedback patterns
+- Semantic classification of text responses
+- Statistical aggregation of scores
+- NO pronunciation expertise needed - only text pattern recognition
+
+INPUT: Coaching session transcript between ALEX (coach) and PETER (student)
+OUTPUT: Strict JSON with performance statistics
 
 METHODOLOGY & CALCULATIONS:
 
@@ -100,23 +106,29 @@ METHODOLOGY & CALCULATIONS:
    SEMANTIC CLASSIFICATION RULES:
    
    A. INCORRECT (0%) - Negative feedback or explicit correction:
-      - Direct negatives: "No", "Incorrect", "Not yet", "Wrong", "Not quite"
-      - Corrections given: "Try again", "Let me hear it again", "That's not right"
-      - Explicit errors pointed out: "You're using American R", "Too much tension"
-      - Comparative negatives: "Still not there", "That's worse"
+      - Direct negatives: "No", "Incorrect", "Not yet", "Wrong", "Not quite", "Nope"
+      - Corrections given: "Try again", "Let me hear it again", "That's not right", "One more time"
+      - Explicit errors pointed out: "You're using American R", "Too much tension", "Wrong vowel"
+      - Comparative negatives: "Still not there", "That's worse", "Going backwards"
+      - Frustration indicators: "We need to work on this more", "This is still a problem"
+      - Additional examples: "I hear the American influence", "That's still too rhotic", "Missing the mark"
    
    B. PARTIALLY CORRECT (50%) - Mixed feedback or incremental progress:
-      - Progress indicators: "Better", "Getting there", "Closer", "Improving", "Almost"
-      - Qualified praise: "That's better than before", "Much improved", "Nearly perfect"
-      - Conditional approval: "Better, but...", "Good, however...", "On the right track"
-      - Partial success: "The first part was good", "Better on that sound"
+      - Progress indicators: "Better", "Getting there", "Closer", "Improving", "Almost", "Warmer"
+      - Qualified praise: "That's better than before", "Much improved", "Nearly perfect", "Getting closer"
+      - Conditional approval: "Better, but...", "Good, however...", "On the right track, but..."
+      - Partial success: "The first part was good", "Better on that sound", "Half right"
+      - Encouragement with reservation: "You're improving", "I can hear progress", "Not bad"
+      - Additional examples: "That's more like it, but not quite", "Closer to RP", "Progress, keep going"
    
    C. CORRECT (100%) - Positive affirmation or mastery confirmation:
-      - Direct praise: "Perfect", "Excellent", "Spot on", "That's right", "Correct"
-      - Strong affirmations: "Well done", "Brilliant", "Exactly", "Yes", "Good"
-      - Mastery statements: "You've got it", "That's it", "Nailed it", "Beautiful"
-      - Encouraging continuation: "Keep going", "Do that again", "Exactly like that"
-      - Natural variations: "That was perfect", "It was correct this time", "Much better now"
+      - Direct praise: "Perfect", "Excellent", "Spot on", "That's right", "Correct", "Yes"
+      - Strong affirmations: "Well done", "Brilliant", "Exactly", "Good", "Lovely", "Wonderful"
+      - Mastery statements: "You've got it", "That's it", "Nailed it", "Beautiful", "Textbook RP"
+      - Encouraging continuation: "Keep going", "Do that again", "Exactly like that", "Maintain that"
+      - Natural variations: "That was perfect", "It was correct this time", "Much better now", "Now you're speaking RP"
+      - Implicit approval: "Right, let's move on", "Good, next one", "Okay, that's fine"
+      - Additional examples: "Native RP speaker right there", "I couldn't tell you apart from BBC", "Flawless"
    
    CRITICAL: Focus on INTENT and SENTIMENT, not exact phrases. Alex's feedback is natural and varied.
    
@@ -155,22 +167,41 @@ METHODOLOGY & CALCULATIONS:
       - Example: "rare" → NO stress pattern drill (single syllable)
       - Example: "sustainability" → 1 stress pattern drill if Alex corrected emphasis
 
-3. EXERCISE RATIO GUIDANCE FOR ALEX (Next Session Recommendation):
+3. NO THRESHOLDS - COUNT EVERYTHING:
+   
+   CRITICAL: There are NO minimum thresholds. Count and score ALL drills regardless of:
+   - Number of attempts (1 attempt is valid, 100 attempts is valid)
+   - Number of items in a category (1 phoneme is valid, 50 phonemes is valid)
+   - Category balance (all phonemes and no intonation is valid)
+   
+   EVERY drill counts. EVERY attempt counts. NO EXCLUSIONS.
+   
+4. EXERCISE RATIO GUIDANCE FOR ALEX (Next Session Recommendation):
    
    Recommend balanced practice distribution:
    - For every 3 phoneme drills → suggest 1 intonation exercise + 1 stress pattern exercise
    - Example: If session had 9 phoneme drills, recommend adding 3 intonation + 3 stress exercises
    - This ensures comprehensive RP training across all categories
    
-4. OVERALL SCORE CALCULATION (Simple Average):
+5. OVERALL SCORE CALCULATION (Grand Average of ALL Attempts):
    
-   - Calculate as simple arithmetic mean of all 3 categories
-   - Formula: (phonetics + intonation + stress_rhythm) / 3
-   - ALL practice items count, regardless of number of attempts
-   - Categories always have scores (never null)
-   - If a category has zero drills, its score is 0%
-
-4. CALCULATE SCORES (Follow exact formula):
+   CRITICAL: Overall score = average of ALL INDIVIDUAL attempt scores across ALL categories
+   
+   Formula: sum(all_individual_attempt_scores) / count(all_attempts)
+   
+   DO NOT average category scores. Average the raw attempt scores.
+   
+   Example:
+   - Phonetics: /r/ attempts [0, 0, 50], /ɔː/ attempts [100, 100]
+   - Intonation: Wh-Q attempts [50, 50]
+   - Stress: Photo attempts [0]
+   
+   WRONG: (16.7 + 100 + 50 + 0) / 4 categories = 41.7%
+   CORRECT: (0+0+50+100+100+50+50+0) / 8 attempts = 43.75% → round to 44%
+   
+   ALL individual attempt scores count equally, regardless of category.
+   
+6. CALCULATE SCORES (Follow exact formula):
    
    A. Item Score Calculation:
       - For each specific item (e.g., "/r/" or "Wh-Question"):
@@ -241,7 +272,8 @@ OUTPUT FORMAT (Strict JSON - NO markdown, NO extra text):
   "overall_rp_proficiency": 63
 }
 
-NOTE: Overall score calculated as simple average: (62 + 60 + 50) / 3 = 57.3 ≈ 57%. Always includes all categories.
+NOTE: Overall score calculated as grand average of ALL attempts: (0+0+50+100+100+50+50+0) / 8 = 43.75% → 44%
+NOT as category average: (58+60+50)/3 would be wrong.
 
 EXAMPLE SEMANTIC ANALYSIS (How to interpret varied feedback):
 
