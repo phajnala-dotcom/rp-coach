@@ -248,7 +248,9 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
           },
         }));
         
-        // Log user audio (check if significant audio, not just silence)
+        // Log user audio activity (detect when user speaks)
+        // [AUDIO_DETECTED] serves as attempt counter for the analyzer
+        // Pattern: 1 PETER:[AUDIO_DETECTED] + 1 ALEX:feedback = 1 attempt
         if (pcmData.length > 0) {
           const rms = Math.sqrt(
             processedData.reduce((sum: number, val: number) => sum + val * val, 0) / processedData.length
@@ -258,7 +260,7 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
             const entry: TranscriptEntry = {
               timestamp: Date.now(),
               speaker: 'user',
-              text: '[AUDIO_DETECTED]', // Placeholder - Phase 2 will add transcription
+              text: '[AUDIO_DETECTED]', // Placeholder - marks one attempt
             };
             
             transcriptLogRef.current = [...transcriptLogRef.current, entry];
@@ -386,9 +388,9 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
         // Send setup message
         ws.send(JSON.stringify({
           setup: {
-            model: 'models/gemini-2.5-flash-native-audio-preview-09-2025',
+            model: 'models/gemini-2.5-flash-native-audio-preview-12-2025',
             generationConfig: {
-              responseModalities: ['AUDIO'],
+              responseModalities: ['AUDIO'], // Native Audio API only supports AUDIO modality
               temperature: temperature,
               speechConfig: {
                 voiceConfig: {
@@ -509,10 +511,52 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
   // ============================================================================
 
   const handleWebSocketMessage = useCallback((data: any) => {
+    // DEBUG: Log full message structure to understand Gemini's response format
+    if (data.serverContent || data.setupComplete) {
+      console.log('📨 WebSocket message received:', JSON.stringify(data, null, 2));
+    }
+    
     // Handle setup completion
     if (data.setupComplete) {
       console.log('Setup complete');
       return;
+    }
+
+    // CRITICAL FIX: Handle user transcription from Gemini's grounding attribution
+    // When Gemini receives user audio, it may include transcription in groundingMetadata or userInput
+    if (data.serverContent?.groundingMetadata?.userTranscript) {
+      const userText = data.serverContent.groundingMetadata.userTranscript.trim();
+      if (userText && userText !== '[AUDIO_DETECTED]') {
+        const entry: TranscriptEntry = {
+          timestamp: Date.now(),
+          speaker: 'user',
+          text: userText,
+        };
+        
+        transcriptLogRef.current = [...transcriptLogRef.current, entry];
+        setTranscriptLog(transcriptLogRef.current);
+        console.log('📝 User transcript captured:', userText);
+      }
+    }
+
+    // Alternative: Check if Gemini provides user turn data
+    if (data.serverContent?.turnComplete && data.serverContent?.userTurn?.parts) {
+      data.serverContent.userTurn.parts.forEach((part: any) => {
+        if (part.text) {
+          const userText = part.text.trim();
+          if (userText) {
+            const entry: TranscriptEntry = {
+              timestamp: Date.now(),
+              speaker: 'user',
+              text: userText,
+            };
+            
+            transcriptLogRef.current = [...transcriptLogRef.current, entry];
+            setTranscriptLog(transcriptLogRef.current);
+            console.log('📝 User transcript captured from turn:', userText);
+          }
+        }
+      });
     }
 
     // Handle server content (audio + text)
@@ -533,6 +577,8 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
               
               transcriptLogRef.current = [...transcriptLogRef.current, entry];
               setTranscriptLog(transcriptLogRef.current);
+              
+              console.log('📝 Alex transcript captured:', serverContent);
               
               // Auto-enable report generation after meaningful conversation
               if (transcriptLogRef.current.length > 10) {

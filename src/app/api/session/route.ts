@@ -3,7 +3,7 @@ import { buildSystemInstruction, generateSessionId } from '@/lib/prompt-builder'
 import { SessionMetrics, AsyncSessionReport, DEFAULT_USER_PROFILE, STORAGE_KEYS } from '@/types';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
+const MODEL = 'gemini-2.5-flash-native-audio-preview-12-2025';
 
 export async function POST(request: NextRequest) {
   try {

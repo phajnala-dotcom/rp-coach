@@ -99,33 +99,26 @@ OUTPUT: Strict JSON with performance statistics
 
 METHODOLOGY & CALCULATIONS:
 
-1. EXTRACT DRILLS:
-   - Scan for utterances where ALEX corrects PETER
-   - Use semantic similarity to classify ALEX's feedback into 3 categories
+1. EXTRACT DRILLS & CLASSIFY FEEDBACK:
    
-   SEMANTIC CLASSIFICATION (3-Level System):
+   For each ALEX response to PETER's attempt, categorize the evaluation into ONE of these 3 categories:
    
-   Your task: For each ALEX response, determine semantic similarity to these evaluation concepts:
+   - "incorrect" → 0%
+   - "partially correct" → 50%
+   - "correct" → 100%
    
-   CATEGORY A - INCORRECT (Score: 0%):
-   Semantic concept: "The attempt was wrong, needs correction, explicit error"
-   
-   CATEGORY B - PARTIALLY CORRECT (Score: 50%):
-   Semantic concept: "Showing progress, getting better, but not yet perfect"
-   
-   CATEGORY C - CORRECT (Score: 100%):
-   Semantic concept: "The attempt was right, successful, approved, mastered"
-   
-   CRITICAL INSTRUCTIONS:
-   - Use your inherent semantic understanding - no phrase matching needed
-   - Classify based on INTENT and MEANING, not specific words
-   - When uncertain, default to the category with closest semantic similarity
-   - If feedback contains mixed signals, weigh the dominant sentiment
+   Use semantic similarity to determine which category best matches the feedback's meaning.
+   Every PETER attempt that receives ALEX feedback MUST be categorized and assigned its % value.
    
    COUNTING ATTEMPTS:
    - Count EVERY instance where PETER attempts a sound/word/pattern and ALEX responds with evaluative feedback
+   - PETER's audio is logged as "[AUDIO_DETECTED]" - this marks when Peter spoke
+   - Pattern: 1 PETER:[AUDIO_DETECTED] + next ALEX:feedback = 1 attempt
+   - Example transcript:
+     [10:30:15] PETER: [AUDIO_DETECTED]
+     [10:30:17] ALEX: "Not quite. You're using an American R."
+     → This counts as 1 attempt at /r/ pronunciation, scored 0%
    - Include attempts even if feedback is indirect or conversational
-   - Example: If PETER says "car" 6 times and ALEX responds each time, that's 6 attempts
    - DO NOT require exact phrase matching - use semantic understanding of the interaction
 
 2. CATEGORIZE WITH HOLISTIC AUDITORY EVALUATION:
@@ -227,6 +220,11 @@ METHODOLOGY & CALCULATIONS:
    - 91-100%: "MASTERED"
 
 OUTPUT FORMAT (Strict JSON - NO markdown, NO extra text):
+
+STEP 1: Calculate category weighted_score for each category
+STEP 2: Calculate overall_rp_proficiency as grand average of ALL attempts
+
+Example:
 {
   "overall_rp_proficiency": 62,
   "categories": {
@@ -258,41 +256,94 @@ OUTPUT FORMAT (Strict JSON - NO markdown, NO extra text):
     "primary_focus": "Non-rhotic /r/ in word-final position",
     "secondary_focus": "Word stress patterns in multi-syllable words",
     "warmup_topic": "Minimal pairs: car vs cah, far vs fah"
-  },
-  "overall_rp_proficiency": 63
+  }
 }
 
-NOTE: Overall score calculated as grand average of ALL attempts: (0+0+50+100+100+50+50+0) / 8 = 43.75% → 44%
-NOT as category average: (58+60+50)/3 would be wrong.
+HOW TO CALCULATE overall_rp_proficiency (CRITICAL - FOLLOW EXACTLY):
+
+This is a SIMPLE AVERAGE of ALL individual attempt scores across ALL categories.
+
+STEP-BY-STEP PROCESS:
+1. For each item (/r/, /ɔː/, Wh-Q, etc), you have:
+   - score (0-100) - the average for that specific item
+   - attempts (count) - how many times that item was drilled
+   
+2. Reconstruct individual attempt scores:
+   - If /r/ has score=40% with 10 attempts → that's 10 individual attempts, each scored at 40%
+   - If /ɔː/ has score=80% with 5 attempts → that's 5 individual attempts, each scored at 80%
+   
+3. Create one big list of ALL individual attempt scores from ALL items:
+   - /r/: 40, 40, 40, 40, 40, 40, 40, 40, 40, 40 (10 times)
+   - /ɔː/: 80, 80, 80, 80, 80 (5 times)
+   - etc.
+   
+4. Calculate the SIMPLE AVERAGE of this big list:
+   overall_rp_proficiency = SUM(all scores) / COUNT(all attempts)
+
+SHORTCUT FORMULA (equivalent to above):
+overall_rp_proficiency = (score₁ × attempts₁ + score₂ × attempts₂ + ... + scoreₙ × attemptsₙ) / (attempts₁ + attempts₂ + ... + attemptsₙ)
+
+Example with 4 attempts (3× "car" phoneme + 1× question intonation):
+- Attempt 1: 0%
+- Attempt 2: 50%
+- Attempt 3: 50%
+- Attempt 4: 100%
+
+Overall = (0 + 50 + 50 + 100) / 4 = 200 / 4 = 50%
+
+For the JSON example above with /r/ (10 attempts at 40%), /ɔː/ (5 attempts at 80%), etc:
+- Each /r/ attempt contributes 40% (10 times)
+- Each /ɔː/ attempt contributes 80% (5 times)
+- Each /θ/ attempt contributes 67% (3 times)
+- Each Wh-Q attempt contributes 100% (3 times)
+- Each Yes/No-Q attempt contributes 50% (4 times)
+- Each Statement attempt contributes 60% (5 times)
+- Each Photograph attempt contributes 50% (2 times)
+
+Sum: (40×10) + (80×5) + (67×3) + (100×3) + (50×4) + (60×5) + (50×2) = 400+400+201+300+200+300+100 = 1901
+Count: 10 + 5 + 3 + 3 + 4 + 5 + 2 = 32 total attempts
+Overall = 1901 / 32 = 59.4% → round to 60%
+
+DO NOT use category weighted_score values to calculate overall score.
+DO NOT calculate: (55+67+50)/3 ← THIS IS WRONG
+The overall score is NOTtegory scores.
+The overall score IS an average of individual attempt scores.
 
 EXAMPLE SEMANTIC ANALYSIS (How to interpret varied feedback):
 
 Transcript excerpt:
-PETER: "car"
+PETER: [AUDIO_DETECTED]
 ALEX: "Not quite. You're still using an American R."
 → Score: 0% (explicit correction)
+→ Drill identified: /r/ phoneme (from "American R")
 
-PETER: "car"
+PETER: [AUDIO_DETECTED]
 ALEX: "Better, but the R is still there."
 → Score: 50% (progress indicator with qualification)
 
-PETER: "car"
+PETER: [AUDIO_DETECTED]
 ALEX: "That's it! Much better now."
 → Score: 100% (strong affirmation + positive)
 
-PETER: "car"
+PETER: [AUDIO_DETECTED]
 ALEX: "Perfect. That was excellent."
 → Score: 100% (direct praise)
 
-PETER: "car"
+PETER: [AUDIO_DETECTED]
 ALEX: "You've got it this time!"
 → Score: 100% (mastery statement)
 
-PETER: "car"
+PETER: [AUDIO_DETECTED]
 ALEX: "Almost there, keep practicing."
 → Score: 50% (progress but not mastery)
 
 Result for /r/ sound: 6 attempts, scores [0, 50, 100, 100, 100, 50] = 400/6 = 67%
+
+CRITICAL: Extract the specific drill from ALEX's feedback
+- "American R" → /r/ phoneme
+- "vowel in 'car'" → /ɑː/ phoneme
+- "question intonation" → Wh-Question intonation pattern
+- "word stress in 'photograph'" → Photograph stress pattern
 
 CRITICAL RULES:
 - Calculate weighted_score EXACTLY as described (weighted mean, not simple average)

@@ -173,7 +173,7 @@ export default function Home() {
                   </button>
 
                   {/* Last Overall Score Visualization */}
-                  {lastOverallScore !== null && (
+                  {lastOverallScore !== null && lastOverallScore !== undefined && (
                     <div className="mt-6 text-center space-y-4">
                       <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-gray-800/50 to-gray-900/50 rounded-2xl border border-gray-700/50 backdrop-blur-sm">
                         <span className="text-gray-300 text-lg font-medium">Last Session RP Proficiency:</span>
@@ -187,11 +187,13 @@ export default function Home() {
                       </div>
                       
                       {/* View Full Report Link */}
-                      <Link href="/report">
-                        <button className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl font-bold transition-all transform hover:scale-105 shadow-lg">
-                          📊 View Full Evaluation Report
-                        </button>
-                      </Link>
+                      <div className="mt-4">
+                        <Link href="/report">
+                          <button className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl font-bold text-lg transition-all transform hover:scale-105 shadow-lg">
+                            📊 View Full Evaluation Report
+                          </button>
+                        </Link>
+                      </div>
                     </div>
                   )}
                 </div>
