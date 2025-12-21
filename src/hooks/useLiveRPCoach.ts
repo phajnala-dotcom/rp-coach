@@ -1,5 +1,5 @@
 // ============================================================================
-// LIVE RP COACH HOOK - Full-Duplex Audio with Gemini 2.5 Flash Native Audio
+// LIVE GENAM COACH HOOK - Full-Duplex Audio with Gemini 2.5 Flash Native Audio
 // ============================================================================
 
 'use client';
@@ -39,6 +39,14 @@ interface UseLiveRPCoachReturn {
   isPaused: boolean; // Session pause state
   toggleMute: () => void; // Toggle mic mute
   togglePause: () => void; // Toggle session pause
+  diagnosticTimeRemaining: number; // Phase 1: 2-minute diagnostic countdown
+  diagnosticComplete: boolean; // Phase 1: Diagnostic finished flag
+  currentScores: {
+    overall: number;
+    phonetics: number;
+    intonation: number;
+    stress: number;
+  } | null; // Phase 1: Real-time scores from JSON
 }
 
 export function useLiveRPCoach(): UseLiveRPCoachReturn {
@@ -58,6 +66,14 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
   const [transcriptLog, setTranscriptLog] = useState<TranscriptEntry[]>([]);
   const [isMuted, setIsMuted] = useState(false); // Mic mute state
   const [isPaused, setIsPaused] = useState(false); // Session pause state
+  const [diagnosticTimeRemaining, setDiagnosticTimeRemaining] = useState(120); // 2 minutes
+  const [diagnosticComplete, setDiagnosticComplete] = useState(false);
+  const [currentScores, setCurrentScores] = useState<{
+    overall: number;
+    phonetics: number;
+    intonation: number;
+    stress: number;
+  } | null>(null);
 
   // Refs
   const wsRef = useRef<WebSocket | null>(null);
@@ -278,6 +294,21 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
       source.connect(processor);
       processor.connect(audioContext.destination);
       
+      // iOS Background Support: Create silent oscillator to keep audio context alive
+      // This prevents iOS from suspending the WebSocket when screen locks
+      try {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 1; // 1Hz (inaudible)
+        gainNode.gain.value = 0.001; // Near-silent volume
+        oscillator.start();
+        console.log('🍎 iOS keep-alive oscillator started (silent background audio)');
+      } catch (e) {
+        console.warn('Could not create iOS keep-alive oscillator:', e);
+      }
+      
       // Start monitoring input audio levels
       startAudioLevelMonitoring();
       
@@ -458,6 +489,34 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
         });
         activeAudioSourcesRef.current = [];
         
+        // Save diagnostic scores if they exist (session expired before manual stop)
+        if (currentScores && currentScores.overall > 0) {
+          const report = {
+            session_id: currentSessionIdRef.current || generateSessionId(),
+            timestamp: new Date().toISOString(),
+            duration_minutes: sessionStartTimeRef.current 
+              ? Math.round((Date.now() - sessionStartTimeRef.current.getTime()) / 60000)
+              : 0,
+            overall_genam_proficiency: currentScores.overall,
+            scores: currentScores,
+            qualitative_evaluation: 'Session ended unexpectedly',
+            focus_phonemes: [],
+            exercise_types: [],
+            priority_areas: [],
+          };
+          localStorage.setItem(STORAGE_KEYS.LAST_SESSION_REPORT, JSON.stringify(report));
+          console.log('💾 Auto-saved diagnostic scores on session close:', currentScores.overall);
+        }
+        
+        // Save transcript if exists
+        if (transcriptLogRef.current.length > 0) {
+          localStorage.setItem(
+            STORAGE_KEYS.TRANSCRIPT_LOG,
+            JSON.stringify(transcriptLogRef.current)
+          );
+          console.log(`💾 Auto-saved transcript on session close: ${transcriptLogRef.current.length} entries`);
+        }
+        
         // Only auto-reconnect if manually closed AND not too many attempts
         // Disabled auto-reconnect to prevent loops - user must manually restart
         // if (event.code !== 1000 && reconnectAttemptRef.current < RECONNECT_DELAY_MS.length) {
@@ -564,9 +623,81 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
       const { modelTurn } = data.serverContent;
       
       if (modelTurn?.parts) {
+        // First pass: Extract diagnostic JSON if present (don't skip audio!)
+        let diagnosticJsonFound = false;
         modelTurn.parts.forEach((part: any) => {
-          // Handle text responses (log to transcript)
-          if (part.text) {
+          if (part.text && !diagnosticJsonFound) {
+            const serverContent = part.text.trim();
+            if (serverContent) {
+              // Phase 1: Check for diagnostic JSON
+              const jsonMatch = serverContent.match(/\{[^}]*"diagnostic_complete"[^}]*\}/);
+              if (jsonMatch && jsonMatch[0].includes('"diagnostic_complete"') && jsonMatch[0].includes('true')) {
+                try {
+                  const diagnosticData = JSON.parse(jsonMatch[0]);
+                  console.log('📊 Diagnostic JSON received:', diagnosticData);
+                  
+                  // Extract scores
+                  const scores = {
+                    overall: diagnosticData.overall_proficiency_score || 0,
+                    phonetics: diagnosticData.phonetics_score || 0,
+                    intonation: diagnosticData.intonation_score || 0,
+                    stress: diagnosticData.stress_score || 0,
+                  };
+                  
+                  setCurrentScores(scores);
+                  setDiagnosticComplete(true);
+                  
+                  // Only save to localStorage if overall score is valid (> 0)
+                  // This ensures we don't overwrite previous valid scores with invalid ones
+                  if (scores.overall > 0) {
+                    const report = {
+                      session_id: currentSessionIdRef.current || generateSessionId(),
+                      timestamp: new Date().toISOString(),
+                      duration_minutes: 3,
+                      overall_genam_proficiency: scores.overall,
+                      scores: scores,
+                      qualitative_evaluation: diagnosticData.qualitative_evaluation || '',
+                      focus_phonemes: diagnosticData.focus_phonemes || [],
+                      exercise_types: diagnosticData.exercise_types || [],
+                      priority_areas: diagnosticData.priority_areas || [],
+                    };
+                    
+                    localStorage.setItem(STORAGE_KEYS.LAST_SESSION_REPORT, JSON.stringify(report));
+                    setLastReport(report as any);
+                    console.log('✅ Valid diagnostic scores saved to localStorage:', scores.overall);
+                  } else {
+                    console.log('⚠️ Diagnostic scores are 0 - not saving to localStorage (keeping previous valid scores)');
+                  }
+                  
+                  // Play notification sound
+                  if (audioContextRef.current) {
+                    const oscillator = audioContextRef.current.createOscillator();
+                    const gainNode = audioContextRef.current.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContextRef.current.destination);
+                    oscillator.frequency.value = 800;
+                    gainNode.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.3);
+                    oscillator.start();
+                    oscillator.stop(audioContextRef.current.currentTime + 0.3);
+                  }
+                  
+                  console.log('✅ Diagnostic complete - UI updated');
+                  
+                  // Mark as found but continue processing audio in this message
+                  diagnosticJsonFound = true;
+                } catch (e) {
+                  console.error('Failed to parse diagnostic JSON:', e);
+                }
+              }
+            }
+          }
+        });
+        
+        // Second pass: Handle audio and non-JSON text
+        modelTurn.parts.forEach((part: any) => {
+          // Handle text responses (log to transcript) - skip if it was diagnostic JSON
+          if (part.text && !diagnosticJsonFound) {
             const serverContent = part.text.trim();
             if (serverContent) {
               const entry: TranscriptEntry = {
@@ -595,7 +726,7 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
             }
           }
 
-          // Handle audio responses (play back)
+          // Handle audio responses (play back) - ALWAYS process audio
           if (part.inlineData?.mimeType?.startsWith('audio/')) {
             playAudioResponse(part.inlineData.data);
           }
@@ -715,6 +846,11 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
 
     try {
       setError(null);
+      
+      // Reset diagnostic state
+      setDiagnosticTimeRemaining(120); // 2 minutes
+      setDiagnosticComplete(false);
+      setCurrentScores(null);
 
       // Clean up any existing session first
       if (wsRef.current || audioContextRef.current) {
@@ -730,7 +866,7 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
       if (lastReport) {
         console.log('📊 Loading previous session report:', {
           sessionId: lastReport.session_id,
-          overallScore: lastReport.overall_rp_proficiency,
+          overallScore: lastReport.overall_genam_proficiency,
           timestamp: lastReport.timestamp,
         });
       } else {
@@ -788,50 +924,13 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
     }
   }, [connectWebSocket, setupAudio]);
 
+  // PHASE 1: Async analysis removed - using real-time diagnostic JSON instead
   const generateSessionReport = useCallback(async () => {
-    if (transcriptLogRef.current.length < 5) {
-      console.warn('Transcript too short for meaningful analysis (less than 5 entries)');
-      return;
-    }
-
-    setIsGeneratingReport(true);
-
-    try {
-      const response = await fetch('/api/analyze-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcriptLog: transcriptLogRef.current,
-          sessionId: currentSessionIdRef.current || generateSessionId(),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Analysis failed: ${response.statusText}`);
-      }
-
-      const { report } = await response.json();
-
-      // Save report to localStorage
-      localStorage.setItem(
-        STORAGE_KEYS.LAST_SESSION_REPORT,
-        JSON.stringify(report)
-      );
-
-      // Update state to trigger UI update
-      setLastReport(report);
-
-      console.log('✅ Session report generated and saved:', {
-        sessionId: report.session_id,
-        overallScore: report.overall_rp_proficiency,
-        timestamp: report.timestamp,
-      });
-    } catch (err) {
-      console.error('Failed to generate session report:', err);
-      setError(err instanceof Error ? err.message : 'Failed to analyze session');
-    } finally {
-      setIsGeneratingReport(false);
-    }
+    console.log('📊 Report generation: Using diagnostic scores from session (async analysis removed)');
+    
+    // No-op: Report is now generated during session via diagnostic JSON
+    // Scores are saved to localStorage in real-time by message handler
+    setIsGeneratingReport(false);
   }, []);
 
   const stopSession = useCallback(async () => {
@@ -902,7 +1001,7 @@ Session Duration: ${Math.round((Date.now() - (sessionStartTimeRef.current?.getTi
   BASELINE ASSESSMENT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📊 RP PROFICIENCY LEVEL: ${currentMetrics.rp_level}
+┊ GENAM PROFICIENCY LEVEL: ${currentMetrics.genam_level}
 
 🎯 ACCURACY METRICS:
    Overall Accuracy:        ${currentMetrics.current_accuracy}%
@@ -935,18 +1034,18 @@ reports will measure improvement against these initial metrics.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Generated by RP Native Coach • Powered by Gemini 2.5 Flash
+Generated by GenAm Coach • Powered by Gemini 2.5 Flash
 `;
         } else {
           // PROGRESS REPORT
           const accuracyGain = currentMetrics.current_accuracy - initialBenchmark.current_accuracy;
           const confidenceGain = currentMetrics.confidence_score - initialBenchmark.confidence_score;
-          const levelImproved = currentMetrics.rp_level !== initialBenchmark.rp_level;
+          const levelImproved = currentMetrics.genam_level !== initialBenchmark.genam_level;
           const sessionCount = sessionHistory.length + 1;
           
           reportContent = `
 ╔═══════════════════════════════════════════════════════════════╗
-║          MODERN RP PRONUNCIATION - PROGRESS REPORT            ║
+║       GENERAL AMERICAN PRONUNCIATION - PROGRESS REPORT         ║
 ╚═══════════════════════════════════════════════════════════════╝
 
 Student: ${DEFAULT_USER_PROFILE.name}
@@ -959,9 +1058,9 @@ Session Duration: ${Math.round((Date.now() - (sessionStartTimeRef.current?.getTi
   PROGRESS OVERVIEW
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📊 RP LEVEL:
-   Initial:  ${initialBenchmark.rp_level}
-   Current:  ${currentMetrics.rp_level} ${levelImproved ? '✅ IMPROVED!' : ''}
+📊 GENAM LEVEL:
+   Initial:  ${initialBenchmark.genam_level}
+   Current:  ${currentMetrics.genam_level} ${levelImproved ? '✅ IMPROVED!' : ''}
 
 🎯 ACCURACY METRICS:
    Initial Accuracy:    ${initialBenchmark.current_accuracy}%
@@ -1007,7 +1106,7 @@ ${sessionHistory.filter(s => s.achievements.length > 0).map(s =>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Generated by RP Native Coach • Powered by Gemini 2.5 Flash
+Generated by GenAm Coach • Powered by Gemini 2.5 Flash
 `;
         }
 
@@ -1102,6 +1201,45 @@ Generated by RP Native Coach • Powered by Gemini 2.5 Flash
   }, [stopSession]);
 
   // ============================================================================
+  // DIAGNOSTIC TIMER (2-MINUTE COUNTDOWN)
+  // ============================================================================
+
+  useEffect(() => {
+    if (!isConnected || diagnosticComplete || isPaused) return;
+
+    const interval = setInterval(() => {
+      setDiagnosticTimeRemaining(prev => {
+        if (prev <= 1) {
+          // Timer reached zero - send DIAGNOSTIC_COMPLETE signal
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            console.log('⏰ 3-minute diagnostic period complete - sending signal to model');
+            wsRef.current.send(JSON.stringify({
+              clientContent: {
+                turns: [
+                  {
+                    role: 'user',
+                    parts: [
+                      {
+                        text: 'DIAGNOSTIC_COMPLETE'
+                      }
+                    ]
+                  }
+                ],
+                turnComplete: true
+              }
+            }));
+          }
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isConnected, diagnosticComplete, isPaused]);
+
+  // ============================================================================
   // MIC MUTE CONTROL
   // ============================================================================
 
@@ -1185,5 +1323,8 @@ Generated by RP Native Coach • Powered by Gemini 2.5 Flash
     isPaused,
     toggleMute,
     togglePause,
+    diagnosticTimeRemaining,
+    diagnosticComplete,
+    currentScores,
   };
 }

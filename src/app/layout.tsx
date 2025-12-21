@@ -2,8 +2,19 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RP Native Coach - Alex",
-  description: "Real-time Modern RP pronunciation coaching with Gemini 2.5 Flash Native Audio",
+  title: "GenAm Coach - Alex",
+  description: "Real-time General American pronunciation coaching with Gemini 2.5 Flash Native Audio",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "GenAm Coach",
+  },
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
 };
 
 export default function RootLayout({
@@ -13,6 +24,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="GenAm Coach" />
+      </head>
       <body>{children}</body>
     </html>
   );

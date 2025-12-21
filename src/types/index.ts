@@ -5,8 +5,8 @@
 export interface SessionMetrics {
   session_id: string;           // Unique session identifier
   timestamp: string;             // ISO timestamp
-  rp_level: string;              // e.g., "B2"
-  previous_focus: string;        // e.g., "/ɔː/ vowel"
+  genam_level: string;           // e.g., "B2"
+  previous_focus: string;        // e.g., "/æ/ vowel"
   mastery_confirmed: boolean;    // true if user mastered previous_focus
   current_accuracy: number;      // 0-100
   confidence_score: number;      // 0-100: Gemini's confidence in assessment
@@ -57,7 +57,7 @@ export interface AsyncSessionReport {
   session_id: string;
   timestamp: string;
   duration_minutes: number;
-  overall_rp_proficiency: number; // 0-100% simple average of 3 categories
+  overall_genam_proficiency: number; // 0-100% simple average of 3 categories
   categories: {
     phonetics: CategoryResult;
     intonation: CategoryResult;
@@ -86,15 +86,16 @@ export interface ConnectionStatus {
 
 // Storage Keys
 export const STORAGE_KEYS = {
-  INITIAL_BENCHMARK: 'RP_INITIAL_BENCHMARK',
-  CURRENT_STATUS: 'RP_CURRENT_STATUS',
-  SESSION_HISTORY: 'RP_SESSION_HISTORY',
-  USER_PROFILE: 'RP_USER_PROFILE',
-  VOICE_PREFERENCE: 'RP_VOICE_PREFERENCE',
-  TEMPERATURE: 'RP_TEMPERATURE',
-  CUSTOM_PROMPT: 'RP_CUSTOM_PROMPT',
-  TRANSCRIPT_LOG: 'RP_TRANSCRIPT_LOG',           // New: Session transcript
-  LAST_SESSION_REPORT: 'RP_LAST_SESSION_REPORT', // New: For Phase 2
+  INITIAL_BENCHMARK: 'GENAM_INITIAL_BENCHMARK',
+  CURRENT_STATUS: 'GENAM_CURRENT_STATUS',
+  SESSION_HISTORY: 'GENAM_SESSION_HISTORY',
+  USER_PROFILE: 'GENAM_USER_PROFILE',
+  VOICE_PREFERENCE: 'GENAM_VOICE_PREFERENCE',
+  TEMPERATURE: 'GENAM_TEMPERATURE',
+  CUSTOM_PROMPT: 'GENAM_CUSTOM_PROMPT',
+  TRANSCRIPT_LOG: 'GENAM_TRANSCRIPT_LOG',           // New: Session transcript
+  LAST_SESSION_REPORT: 'GENAM_LAST_SESSION_REPORT', // New: For Phase 2
+  PROFICIENCY_HISTORY: 'GENAM_PROFICIENCY_HISTORY',  // New: Phase 2 progress tracking
 } as const;
 
 // Voice Options (30 voices from Gemini API, alphabetically sorted)

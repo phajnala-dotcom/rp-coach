@@ -5,7 +5,7 @@ import { AsyncSessionReport, STORAGE_KEYS } from '@/types';
 import Link from 'next/link';
 
 export default function ReportPage() {
-  const [report, setReport] = useState<AsyncSessionReport | null>(null);
+  const [report, setReport] = useState<any | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -29,6 +29,12 @@ export default function ReportPage() {
       </div>
     );
   }
+
+  // Handle both old AsyncSessionReport format and new diagnostic format
+  const overallScore = report.overall_genam_proficiency || report.scores?.overall || 0;
+  const phoneticsScore = report.categories?.phonetics?.weighted_score || report.scores?.phonetics || 0;
+  const intonationScore = report.categories?.intonation?.weighted_score || report.scores?.intonation || 0;
+  const stressScore = report.categories?.stress_rhythm?.weighted_score || report.scores?.stress || 0;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -72,9 +78,9 @@ export default function ReportPage() {
               <p className="font-bold text-white">{report.duration_minutes} minutes</p>
             </div>
             <div className="col-span-2 md:col-span-1">
-              <p className="text-sm text-gray-400">Overall RP Proficiency</p>
-              <p className={`text-3xl font-black ${getScoreColor(report.overall_rp_proficiency)}`}>
-                {report.overall_rp_proficiency}%
+              <p className="text-sm text-gray-400">Overall GenAm Proficiency</p>
+              <p className={`text-3xl font-black ${getScoreColor(overallScore)}`}>
+                {overallScore}%
               </p>
             </div>
           </div>
@@ -85,34 +91,59 @@ export default function ReportPage() {
           {/* Phonetics */}
           <div className="bg-gradient-to-br from-blue-900/40 to-indigo-900/40 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-blue-500/30">
             <h3 className="text-xl font-bold text-blue-300 mb-2">Phonetics</h3>
-            <p className={`text-4xl font-black ${getScoreColor(report.categories.phonetics.weighted_score)}`}>
-              {report.categories.phonetics.weighted_score}%
+            <p className={`text-4xl font-black ${getScoreColor(phoneticsScore)}`}>
+              {phoneticsScore}%
             </p>
           </div>
 
           {/* Intonation */}
           <div className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-purple-500/30">
             <h3 className="text-xl font-bold text-purple-300 mb-2">Intonation</h3>
-            <p className={`text-4xl font-black ${getScoreColor(report.categories.intonation.weighted_score)}`}>
-              {report.categories.intonation.weighted_score}%
+            <p className={`text-4xl font-black ${getScoreColor(intonationScore)}`}>
+              {intonationScore}%
             </p>
           </div>
 
           {/* Stress & Rhythm */}
           <div className="bg-gradient-to-br from-green-900/40 to-emerald-900/40 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-green-500/30">
             <h3 className="text-xl font-bold text-green-300 mb-2">Stress & Rhythm</h3>
-            <p className={`text-4xl font-black ${getScoreColor(report.categories.stress_rhythm.weighted_score)}`}>
-              {report.categories.stress_rhythm.weighted_score}%
+            <p className={`text-4xl font-black ${getScoreColor(stressScore)}`}>
+              {stressScore}%
             </p>
           </div>
         </div>
 
+        {/* Qualitative Notes */}
+        {(report.qualitative_evaluation || report.qualitative_notes) && (
+          <div className="bg-gradient-to-br from-gray-900/80 to-slate-900/80 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-gray-700/50">
+            <h3 className="text-xl font-bold mb-4 text-white">Evaluation Summary</h3>
+            <p className="text-gray-300 leading-relaxed">
+              {report.qualitative_evaluation || report.qualitative_notes}
+            </p>
+          </div>
+        )}
+
+        {/* Focus Areas */}
+        {(report.focus_phonemes || report.priority_areas) && (
+          <div className="bg-gradient-to-br from-gray-900/80 to-slate-900/80 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-gray-700/50">
+            <h3 className="text-xl font-bold mb-4 text-white">Areas to Focus On</h3>
+            <div className="space-y-2">
+              {(report.focus_phonemes || report.priority_areas || []).map((area: string, idx: number) => (
+                <div key={idx} className="flex items-center gap-2 text-gray-300">
+                  <span className="text-yellow-400">•</span>
+                  <span>{area}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Detailed Attempts Table - Phonetics */}
-        {report.categories.phonetics.items.length > 0 && (
+        {report.categories?.phonetics?.items && report.categories.phonetics.items.length > 0 && (
           <div className="bg-gradient-to-br from-gray-900/80 to-slate-900/80 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-gray-700/50">
             <h2 className="text-2xl font-bold mb-4 text-blue-300">📊 Phonetics - All Attempts</h2>
             <div className="space-y-2">
-              {report.categories.phonetics.items.map((item, idx) => (
+              {report.categories.phonetics.items.map((item: any, idx: number) => (
                 <div key={idx} className={`p-4 rounded-xl border-2 ${getStatusColor(item.status)}`}>
                   <div className="flex justify-between items-center flex-wrap gap-2">
                     <span className="font-bold text-lg">{item.name}</span>
@@ -129,11 +160,11 @@ export default function ReportPage() {
         )}
 
         {/* Detailed Attempts Table - Intonation */}
-        {report.categories.intonation.items.length > 0 && (
+        {report.categories?.intonation?.items && report.categories.intonation.items.length > 0 && (
           <div className="bg-gradient-to-br from-gray-900/80 to-slate-900/80 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-gray-700/50">
             <h2 className="text-2xl font-bold mb-4 text-purple-300">🎵 Intonation - All Attempts</h2>
             <div className="space-y-2">
-              {report.categories.intonation.items.map((item, idx) => (
+              {report.categories.intonation.items.map((item: any, idx: number) => (
                 <div key={idx} className={`p-4 rounded-xl border-2 ${getStatusColor(item.status)}`}>
                   <div className="flex justify-between items-center flex-wrap gap-2">
                     <span className="font-bold text-lg">{item.name}</span>
@@ -150,11 +181,11 @@ export default function ReportPage() {
         )}
 
         {/* Detailed Attempts Table - Stress & Rhythm */}
-        {report.categories.stress_rhythm.items.length > 0 && (
+        {report.categories?.stress_rhythm?.items && report.categories.stress_rhythm.items.length > 0 && (
           <div className="bg-gradient-to-br from-gray-900/80 to-slate-900/80 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-gray-700/50">
             <h2 className="text-2xl font-bold mb-4 text-green-300">🎼 Stress & Rhythm - All Attempts</h2>
             <div className="space-y-2">
-              {report.categories.stress_rhythm.items.map((item, idx) => (
+              {report.categories.stress_rhythm.items.map((item: any, idx: number) => (
                 <div key={idx} className={`p-4 rounded-xl border-2 ${getStatusColor(item.status)}`}>
                   <div className="flex justify-between items-center flex-wrap gap-2">
                     <span className="font-bold text-lg">{item.name}</span>

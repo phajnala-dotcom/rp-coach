@@ -27,33 +27,48 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in;
+  }
 }
 
-/* UK-Themed Voice Orb */
-.uk-orb {
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* US-Themed Voice Orb */
+.us-orb {
   position: relative;
-  background: linear-gradient(135deg, #002868 0%, #c8102e 50%, #ffffff 100%);
-  animation: ukGlow 3s ease-in-out infinite;
+  background: linear-gradient(135deg, #3C3B6E 0%, #B22234 50%, #ffffff 100%);
+  animation: usGlow 3s ease-in-out infinite;
   box-shadow: 
-    0 0 60px rgba(200, 16, 46, 0.4),
-    0 0 100px rgba(0, 40, 104, 0.3),
+    0 0 60px rgba(178, 34, 52, 0.4),
+    0 0 100px rgba(60, 59, 110, 0.3),
     inset 0 0 80px rgba(255, 255, 255, 0.1);
   will-change: transform, box-shadow;
   transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
 }
 
-.uk-orb-listening {
-  animation: ukGlowActive 1.5s ease-in-out infinite;
+.us-orb-listening {
+  animation: usGlowActive 1.5s ease-in-out infinite;
   box-shadow: 
-    0 0 80px rgba(200, 16, 46, 0.6),
-    0 0 120px rgba(0, 40, 104, 0.5),
+    0 0 80px rgba(178, 34, 52, 0.6),
+    0 0 120px rgba(60, 59, 110, 0.5),
     0 0 160px rgba(255, 255, 255, 0.3),
     inset 0 0 100px rgba(255, 255, 255, 0.2);
   will-change: transform, box-shadow;
   transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
 }
 
-@keyframes ukGlow {
+@keyframes usGlow {
   0%, 100% {
     transform: scale(1) rotate(0deg);
     filter: brightness(1);
@@ -64,24 +79,24 @@ body {
   }
 }
 
-@keyframes ukGlowActive {
+@keyframes usGlowActive {
   0%, 100% {
     transform: scale(1) rotate(0deg);
     box-shadow: 
-      0 0 80px rgba(200, 16, 46, 0.6),
-      0 0 120px rgba(0, 40, 104, 0.5),
+      0 0 80px rgba(178, 34, 52, 0.6),
+      0 0 120px rgba(60, 59, 110, 0.5),
       0 0 160px rgba(255, 255, 255, 0.3);
   }
   50% {
     transform: scale(1.08) rotate(-1deg);
     box-shadow: 
-      0 0 100px rgba(200, 16, 46, 0.8),
-      0 0 140px rgba(0, 40, 104, 0.7),
+      0 0 100px rgba(178, 34, 52, 0.8),
+      0 0 140px rgba(60, 59, 110, 0.7),
       0 0 200px rgba(255, 255, 255, 0.5);
   }
 }
 
-.uk-flag-overlay {
+.us-flag-overlay {
   display: none;
 }
 
