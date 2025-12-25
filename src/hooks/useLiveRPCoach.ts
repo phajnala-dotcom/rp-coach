@@ -86,6 +86,8 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
   const currentSessionIdRef = useRef<string | null>(null);
   const isConnectingRef = useRef(false); // Prevent multiple simultaneous connections
   const activeAudioSourcesRef = useRef<AudioBufferSourceNode[]>([]); // Track active playback
+  const userSpeakingRef = useRef<boolean>(false); // Track if user is currently speaking
+  const lastUserAudioTimeRef = useRef<number>(0); // Timestamp of last detected user audio
   const audioScheduleTimeRef = useRef<number>(0); // Track when next audio should play
   const shouldGenerateReportRef = useRef(false); // Track if report should be generated on session end
   const inputAnalyserRef = useRef<AnalyserNode | null>(null); // Track input audio levels
@@ -272,15 +274,42 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
             processedData.reduce((sum: number, val: number) => sum + val * val, 0) / processedData.length
           );
           
-          if (rms > 0.01) { // Threshold for speech detection
+          const SPEECH_THRESHOLD = 0.05; // Higher threshold to ignore ambient noise and distant speech
+          
+          if (rms > SPEECH_THRESHOLD) {
+            const now = Date.now();
+            lastUserAudioTimeRef.current = now;
+            
+            // User is speaking - immediately stop all AI audio playback
+            if (!userSpeakingRef.current && activeAudioSourcesRef.current.length > 0) {
+              console.log('🎤 User speaking detected - stopping AI audio');
+              activeAudioSourcesRef.current.forEach(source => {
+                try { 
+                  source.stop(); 
+                } catch (e) {
+                  // Source may already be stopped
+                }
+              });
+              activeAudioSourcesRef.current = [];
+              // Reset audio schedule to allow immediate playback after user stops
+              audioScheduleTimeRef.current = audioContextRef.current?.currentTime || 0;
+            }
+            
+            userSpeakingRef.current = true;
+            
             const entry: TranscriptEntry = {
-              timestamp: Date.now(),
+              timestamp: now,
               speaker: 'user',
               text: '[AUDIO_DETECTED]', // Placeholder - marks one attempt
             };
             
             transcriptLogRef.current = [...transcriptLogRef.current, entry];
             setTranscriptLog(transcriptLogRef.current);
+          } else {
+            // Check if user stopped speaking (100ms of silence)
+            if (userSpeakingRef.current && Date.now() - lastUserAudioTimeRef.current > 100) {
+              userSpeakingRef.current = false;
+            }
           }
         }
       };
@@ -419,7 +448,7 @@ export function useLiveRPCoach(): UseLiveRPCoachReturn {
         // Send setup message
         ws.send(JSON.stringify({
           setup: {
-            model: 'models/gemini-2.5-flash-native-audio-preview-12-2025',
+            model: 'models/gemini-2.5-flash-native-audio-preview-09-2025',
             generationConfig: {
               responseModalities: ['AUDIO'], // Native Audio API only supports AUDIO modality
               temperature: temperature,
